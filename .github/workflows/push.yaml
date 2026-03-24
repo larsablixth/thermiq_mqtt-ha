@@ -5,13 +5,16 @@ on:
     branches:
       - master
       - dev
+  pull_request:
+    branches:
+      - master
 
 jobs:
   validate:
     runs-on: "ubuntu-latest"
     name: Validate
     steps:
-        - uses: "actions/checkout@v2"
+        - uses: "actions/checkout@v4"
         - name: HACS validation
           uses: "hacs/action@main"
           with:
@@ -25,11 +28,24 @@ jobs:
     runs-on: "ubuntu-latest"
     name: Check style formatting
     steps:
-        - uses: "actions/checkout@v2"
-        - uses: "actions/setup-python@v1"
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
           with:
-            python-version: "3.x"
+            python-version: "3.12"
         - run: python3 -m pip install black
-        - run: black .
+        - run: black --check .
 
-  
+  test:
+    runs-on: "ubuntu-latest"
+    name: Run tests
+    steps:
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
+          with:
+            python-version: "3.12"
+        - name: Install dependencies
+          run: |
+            python3 -m pip install --upgrade pip
+            python3 -m pip install pytest pytest-asyncio homeassistant
+        - name: Run tests
+          run: python3 -m pytest tests/ -v
