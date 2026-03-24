@@ -28,11 +28,3 @@ DEFAULT_DBG = False
 AVAILABLE_LANGUAGES = ["en", "se", "fi", "no", "de"]
 
 
-PLATFORM_AUTOMATION = "automation"
-PLATFORM_BINARY_SENSOR = "binary_sensor"
-PLATFORM_GROUP = "group"
-PLATFORM_INPUT_BOOLEAN = "input_boolean"
-PLATFORM_INPUT_NUMBER = "input_number"
-PLATFORM_INPUT_SELECT = "input_select"
-PLATFORM_INPUT_TEXT = "input_text"
-CONF_ENTITY_PLATFORM = "entity_platform"

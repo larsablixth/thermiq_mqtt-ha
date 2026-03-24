@@ -4,25 +4,6 @@ from collections.abc import Callable
 
 from homeassistant.config_entries import ConfigEntry
 
-from homeassistant.components.input_number import (
-    ATTR_VALUE as INP_ATTR_VALUE,
-    DOMAIN as NUMBER_DOMAIN,
-    SERVICE_SET_VALUE as NUMBER_SERVICE_SET_VALUE,
-)
-from homeassistant.components.input_select import (
-    DOMAIN as SELECT_DOMAIN,
-
-)
-from homeassistant.components.input_boolean import (
-    DOMAIN as BOOLEAN_DOMAIN,
-)
-
-from homeassistant.const import (
-    ATTR_ENTITY_ID,
-    ATTR_OPTION,
-    SERVICE_SELECT_OPTION as SELECT_SERVICE_SET_OPTION,
-)
-
 from homeassistant.components import mqtt
 
 
@@ -63,7 +44,6 @@ class HeatPump:
     # ###
     async def message_received(self, message):
         """Handle new MQTT messages."""
-        from ..input_boolean import (SERVICE_SET_VALUE as BOOLEAN_SERVICE_SET_VALUE,)
         _LOGGER.debug("%s: message.payload:[%s]", self._id, message.payload)
         try:
             json_dict = json.loads(message.payload)
@@ -103,88 +83,13 @@ class HeatPump:
                     "[%s] [%s] [%s] [%s]", self._id, kstore, json_dict[k], dstore
                 )
 
-                # Internal mapping of ThermIQ_MQTT regs, used to create update events
+                # Store the value under its canonical register key. The
+                # number/select/switch/sensor/binary_sensor entities read from
+                # this shared state when the msg_rec_event fires below, so the
+                # incoming heatpump values always win over the UI.
                 self._hpstate[kstore] = json_dict[k]
                 received.add(kstore)
 
-                # Map incomming registers to named settings based on id_reg (thermiq_regs)
-                if kstore in self._id_reg:
-                    # r01 and r03 should be combined with respective decimal part r02 and r04
-                    # i.e thermiq_mqtt_vp1.outdoor_t
-                    if kstore != "r01" and kstore != "r03":
-                        ## Set the corresponding input_number/input_select if applicable, incomming message always rules over UI settings
-                        regtype = reg_id[self._id_reg[kstore]][1]
-                        if regtype in [
-                            "temperature_input",
-                            "time_input",
-                            "sensor_input",
-                            "generated_input",
-                        ]:
-                            context = {
-                                INP_ATTR_VALUE: json_dict[k],
-                                ATTR_ENTITY_ID: "input_number."
-                                + self._domain
-                                + "_"
-                                + self._id
-                                + "_"
-                                + self._id_reg[kstore],
-                            }
-                            self._hass.async_create_task(
-                                self._hass.services.async_call(
-                                    NUMBER_DOMAIN,
-                                    NUMBER_SERVICE_SET_VALUE,
-                                    context,
-                                    blocking=False,
-                                )
-                            )
-                        if regtype in [
-                            "generated_input_boolean",
-                        ]:
-                            context = {
-                                INP_ATTR_VALUE: json_dict[k],
-                                ATTR_ENTITY_ID: "input_boolean."
-                                + self._domain
-                                + "_"
-                                + self._id
-                                + "_"
-                                + self._id_reg[kstore],
-                            }
-                            self._hass.async_create_task(
-                                self._hass.services.async_call(
-                                    BOOLEAN_DOMAIN,
-                                    BOOLEAN_SERVICE_SET_VALUE,
-                                    context,
-                                    blocking=False,
-                                )
-                            )
-
-                        if regtype == "select_input":
-                            mode = f"mode{json_dict[k]}"
-                            if mode not in id_names:
-                                _LOGGER.warning(
-                                    "Unknown mode value [%s] received for %s, ignoring",
-                                    json_dict[k],
-                                    self._id_reg[kstore],
-                                )
-                            else:
-                                context = {
-                                    ATTR_OPTION: f"{json_dict[k]} - "
-                                    + id_names[mode][self._langid],
-                                    ATTR_ENTITY_ID: "input_select."
-                                    + self._domain
-                                    + "_"
-                                    + self._id
-                                    + "_"
-                                    + self._id_reg[kstore],
-                                }
-                                self._hass.async_create_task(
-                                    self._hass.services.async_call(
-                                        SELECT_DOMAIN,
-                                        SELECT_SERVICE_SET_OPTION,
-                                        context,
-                                        blocking=False,
-                                    )
-                                )
             except (ValueError, KeyError, IndexError, TypeError) as err:
                 _LOGGER.warning(
                     "Could not process key [%s] in MQTT message: %s", k, err
