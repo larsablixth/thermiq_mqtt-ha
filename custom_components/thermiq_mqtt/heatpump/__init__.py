@@ -5,25 +5,6 @@ from collections.abc import Callable
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
 
-from homeassistant.components.input_number import (
-    ATTR_VALUE as INP_ATTR_VALUE,
-    DOMAIN as NUMBER_DOMAIN,
-    SERVICE_SET_VALUE as NUMBER_SERVICE_SET_VALUE,
-)
-from homeassistant.components.input_select import (
-    DOMAIN as SELECT_DOMAIN,
-
-)
-from homeassistant.components.input_boolean import (
-    DOMAIN as BOOLEAN_DOMAIN,
-)
-
-from homeassistant.const import (
-    ATTR_ENTITY_ID,
-    ATTR_OPTION,
-    SERVICE_SELECT_OPTION as SELECT_SERVICE_SET_OPTION,
-)
-
 from homeassistant.components import mqtt
 
 
@@ -65,7 +46,6 @@ class HeatPump:
     @callback
     async def message_received(self, message):
         """Handle new MQTT messages."""
-        from ..input_boolean import (SERVICE_SET_VALUE as BOOLEAN_SERVICE_SET_VALUE,)
         _LOGGER.debug("%s: message.payload:[%s]", self._id, message.payload)
         try:
             json_dict = json.loads(message.payload)
@@ -73,15 +53,10 @@ class HeatPump:
                 for k in json_dict.keys():
                     kstore = k.lower()
                     dstore = k
-                    # # Make INDR_T, EVU and timestamp appear as normal register
-                    # if kstore == "indr_t":
-                    #     kstore = "rf0"
-                    # if kstore == "timestamp":
-                    #     kstore = "rf1"
                     if kstore == "evu":
                         kstore = 'evu'
                         dstore='d300'
-                    # # Create hex notation if incoming register is decimal format
+                    # Create hex notation if incoming register is decimal format
                     # Named registers must be longer than 4 characters to avoid confusion
                     if k[0] == "d" and len(k) < 5:
                         reg = int(k[1:])
@@ -100,87 +75,6 @@ class HeatPump:
 
                     # Internal mapping of ThermIQ_MQTT regs, used to create update events
                     self._hpstate[kstore] = json_dict[k]
-                    # hass.states.async_set(DOMAIN+"." +kstore, json_dict[k])
-
-                    # Map incomming registers to named settings based on id_reg (thermiq_regs)
-                    if kstore in self._id_reg:
-                        # r01 and r03 should be combined with respective decimal part r02 and r04
-                        # i.e thermiq_mqtt_vp1.outdoor_t
-                        if kstore != "r01" and kstore != "r03":
-                            # self._hass.states.async_set(
-                            #     self._domain
-                            #     + "_"
-                            #     + self._id
-                            #     + "."
-                            #     + self._id_reg[kstore],
-                            #     json_dict[k],
-                            # )
-                            ## Set the corresponding input_number/input_select if applicable, incomming message always rules over UI settings
-                            if reg_id[self._id_reg[kstore]][1] in [
-                                "temperature_input",
-                                "time_input",
-                                "sensor_input",
-                                "generated_input",
-                            ]:
-                                context = {
-                                    INP_ATTR_VALUE: json_dict[k],
-                                    ATTR_ENTITY_ID: "input_number."
-                                    + self._domain
-                                    + "_"
-                                    + self._id
-                                    + "_"
-                                    + self._id_reg[kstore],
-                                }
-                                self._hass.async_create_task(
-                                    self._hass.services.async_call(
-                                        NUMBER_DOMAIN,
-                                        NUMBER_SERVICE_SET_VALUE,
-                                        context,
-                                        blocking=False,
-                                    )
-                                )
-                            if reg_id[self._id_reg[kstore]][1] in [
-                                "generated_input_boolean",
-                            ]:
-                                context = {
-                                    INP_ATTR_VALUE: json_dict[k],
-                                    ATTR_ENTITY_ID: "input_boolean."
-                                    + self._domain
-                                    + "_"
-                                    + self._id
-                                    + "_"
-                                    + self._id_reg[kstore],
-                                }
-                                self._hass.async_create_task(
-                                    self._hass.services.async_call(
-                                        BOOLEAN_DOMAIN,
-                                        BOOLEAN_SERVICE_SET_VALUE,
-                                        context,
-                                        blocking=False,
-                                    )
-                                )
-
-                            if reg_id[self._id_reg[kstore]][1] == "select_input":
-                                mode = f"mode{json_dict[k]}"
-
-                                context = {
-                                    ATTR_OPTION: f"{json_dict[k]} - "
-                                    + id_names[mode][self._langid],
-                                    ATTR_ENTITY_ID: "input_select."
-                                    + self._domain
-                                    + "_"
-                                    + self._id
-                                    + "_"
-                                    + self._id_reg[kstore],
-                                }
-                                self._hass.async_create_task(
-                                    self._hass.services.async_call(
-                                        SELECT_DOMAIN,
-                                        SELECT_SERVICE_SET_OPTION,
-                                        context,
-                                        blocking=False,
-                                    )
-                                )
 
                 # Do some post processing of data received
                 self._hpstate["r01"] = self._hpstate["r01"] + self._hpstate["r02"] / 10

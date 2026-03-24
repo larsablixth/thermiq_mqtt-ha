@@ -33,17 +33,15 @@ from .heatpump.thermiq_regs import (
     reg_id,
 )
 
-# from .automation import setup_automations
-from .input_number import setup_input_numbers
-from .input_select import setup_input_selects
-from .input_boolean import setup_input_booleans
-
 _LOGGER = logging.getLogger(__name__)
 SERVICE_SET_VALUE = "set_value"
 
 PLATFORMS = [
     "sensor",
     "binary_sensor",
+    "number",
+    "select",
+    "switch",
 ]
 
 async def async_setup(hass, config):
@@ -518,16 +516,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Make config reload
     rld = entry.add_update_listener(reload_entry)
     entry.async_on_unload(rld)
-    hass.async_create_task(setup_input_numbers(heatpump))
-    hass.async_create_task(setup_input_selects(heatpump))
-    hass.async_create_task(setup_input_booleans(heatpump))
 
-    # Load the platforms for heatpump
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    )
+    # Load all platforms (sensor, binary_sensor, number, select, switch)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Wait for hass to start and then add the input_* entities
+    # Wait for hass to start and then setup MQTT
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, handle_hass_started)
 
     return True
@@ -580,6 +573,10 @@ class ThermIQWorker:
             {"action": "add", "heatpump": config_entry.data[CONF_ID]},
         )
         return heatpump
+
+    def get_entry(self, config_entry: ConfigEntry):
+        """Get heatpump for a config entry."""
+        return self._heatpumps[config_entry.data[CONF_ID]]
 
     def remove_entry(self, config_entry: ConfigEntry):
         """Remove entry."""
