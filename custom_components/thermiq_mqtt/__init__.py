@@ -1,8 +1,7 @@
 """Component for ThermIQ-MQTT support."""
 import logging
-from builtins import property
 from datetime import datetime
-from sqlalchemy import update, select, delete
+from sqlalchemy import update, select
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, Event

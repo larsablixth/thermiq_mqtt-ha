@@ -102,7 +102,7 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 unique_id = f"{DOMAIN}_{id_name}"
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -116,7 +116,7 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 elif prefix.endswith("/"):
                     prefix = prefix[:-1]
                 valid_subscribe_topic(f"{prefix}/#")
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -126,7 +126,7 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 lang = AVAILABLE_LANGUAGES.index(user_input[CONF_LANGUAGE])
 
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -146,7 +146,7 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                     options={},
                 )
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -177,8 +177,6 @@ class OptionsFlow(config_entries.OptionsFlow):
         return data
 
     async def async_step_user(self, user_input=None):
-        s = self.config_entry.data.get(CONF_LANGUAGE)
-
         DATA_SCHEMA = vol.Schema(
             {
                 vol.Required(
@@ -236,7 +234,7 @@ class OptionsFlow(config_entries.OptionsFlow):
             try:
                 entryTitle = self.config_entry.title
                 id_name = self.config_entry.data[CONF_ID]
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -251,7 +249,7 @@ class OptionsFlow(config_entries.OptionsFlow):
                     prefix = prefix[:-1]
                 valid_subscribe_topic(f"{prefix}/#")
 
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -261,7 +259,7 @@ class OptionsFlow(config_entries.OptionsFlow):
             try:
                 lang = AVAILABLE_LANGUAGES.index(user_input[CONF_LANGUAGE])
 
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
@@ -287,7 +285,7 @@ class OptionsFlow(config_entries.OptionsFlow):
                 # This is the options entry, jeep it empty
                 return self.async_create_entry(title="", data={})
 
-            except:
+            except Exception:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
