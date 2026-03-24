@@ -44,7 +44,6 @@ from .heatpump.thermiq_regs import (
 )
 
 
-from functools import cached_property
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -164,9 +163,9 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         """Return the device class of the sensor."""
         return self._vp_reg
 
-    @cached_property
+    @property
     def is_on(self) -> bool:
-        return (self._state==True)
+        return self._state is True
 
     @property
     def sorter(self):
@@ -211,7 +210,3 @@ class HeatPumpBinarySensor(BinarySensorEntity):
             self.async_schedule_update_ha_state()
             _LOGGER.debug("async_update_ha: %s: [%s]",self._idx, str(bool_state))
 
-    @property
-    def device_class(self):
-        """Return the class of this device."""
-        return f"{DOMAIN}_HeatPumpSensor"

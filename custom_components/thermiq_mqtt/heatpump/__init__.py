@@ -182,61 +182,28 @@ class HeatPump:
                                     )
                                 )
 
-                # Do some post processing of data received
+                # Do some post processing of data received (outside the for loop)
                 self._hpstate["r01"] = self._hpstate["r01"] + self._hpstate["r02"] / 10
-
-                # self._hass.states.async_set(
-                #     self._domain + "_" + self._id + "." + self._id_reg["r01"],
-                #     self._hpstate["r01"],
-                # )
-
                 self._hpstate["r03"] = self._hpstate["r03"] + self._hpstate["r04"] / 10
-                # self._hass.states.async_set(
-                #     self._domain + "_" + self._id + "." + self._id_reg["r03"],
-                #     self._hpstate["r03"],
-                # )
 
                 self._hpstate["mqtt_counter"] += 1
 
                 if "time" in json_dict:
                     self._hpstate["time_str"] = json_dict["time"]
-                    # self._hass.states.async_set(
-                    #     self._domain + "_" + self._id + ".time_str", json_dict["time"]
-                    # )
                 elif "Time" in json_dict:
                     self._hpstate["time_str"] = json_dict["Time"]
-                    # self._hass.states.async_set(
-                    #     self._domain + "_" + self._id + ".time_str", json_dict["Time"]
-                    # )
 
                 if "vp_read" in json_dict:
                     self._hpstate["communication_status"] = json_dict["vp_read"]
-
-                    # self._hass.states.async_set(
-                    #     self._domain
-                    #     + "_"
-                    #     + self._id
-                    #     + ".heatpump_communication_status",
-                    #     json_dict["vp_read"],
-                    # )
                 else:
                     self._hpstate["communication_status"] = "Ok"
-                    # self._hass.states.async_set(
-                    #     self._domain
-                    #     + "_"
-                    #     + self._id
-                    #     + ".heatpump_communication_status",
-                    #     "ok",
-                    # )
 
                 if "app_info" in json_dict:
                     self._hpstate["app_info"] = json_dict["app_info"]
 
-
                 self._hass.bus.fire(
                     self._domain + "_" + self._id + "_msg_rec_event", {}
                 )
-
             else:
                 _LOGGER.error("JSON result was not from ThermIQ-mqtt")
         except ValueError:

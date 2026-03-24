@@ -212,7 +212,7 @@ async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decima
             return False
 
     try:
-        result = recorder.async_add_executor_job(_update_celsius)
+        result = await recorder.async_add_executor_job(_update_celsius)
         return result
     except Exception as e:
         _LOGGER.error("Could not update celsius for %s: %s", entity_id, str(e), exc_info=True)
