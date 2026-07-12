@@ -1,8 +1,7 @@
 """Component for ThermIQ-MQTT support."""
 import logging
-from builtins import property
 from datetime import datetime
-from sqlalchemy import update, select, delete
+from sqlalchemy import update, select
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, Event
@@ -164,56 +163,64 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
 async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decimal) -> bool:
     """
     Migrate statistics metadata for a single entity.
+
+    Database work runs in the recorder executor; async_change_statistics_unit
+    is a loop-only API and must be called from the event loop, never from
+    inside the executor job.
     Returns True if successful, False otherwise.
     """
 
-    def _update_celsius(decimal=False):
-        """Update metadata within a database session."""
+    def _update_celsius():
+        """Update metadata within a database session (executor thread).
 
-        try:
-             # Create the session inside the executor job
-            with session_scope(hass=hass, read_only=False) as session:
-                # First check if metadata exists
-                stmt = select(StatisticsMeta).where(
-                    StatisticsMeta.statistic_id == entity_id
+        Returns (found, current_unit). The non-decimal unit fix is done
+        directly in the database here; a needed decimal conversion is
+        signalled back to the event loop via the returned unit.
+        """
+        with session_scope(hass=hass, read_only=False) as session:
+            # First check if metadata exists
+            stmt = select(StatisticsMeta).where(
+                StatisticsMeta.statistic_id == entity_id
+            )
+            result = session.execute(stmt)
+            existing = result.scalar_one_or_none()
+            if existing is None:
+                return (False, None)  # Not an error - sensor might be new
+
+            unit = existing.unit_of_measurement
+            if unit is None:
+                unit = ''
+            if not decimal and unit != UnitOfTemperature.CELSIUS:
+                update_unit = (
+                    update(StatisticsMeta)
+                    .where(StatisticsMeta.statistic_id == entity_id)
+                    .values(
+                        unit_of_measurement=UnitOfTemperature.CELSIUS
+                    )
                 )
-                result = session.execute(stmt)
-                existing = result.scalar_one_or_none()
-                if existing is None:
-                    _LOGGER.debug("No statistics metadata found for %s (new sensor)",entity_id)
-                    return True  # Not an error - sensor might be new
-
-                unit = existing.unit_of_measurement
-                if unit is None:
-                    unit=''
-                if decimal:
-                    if unit!= '0.1'+UnitOfTemperature.CELSIUS:
-                        async_change_statistics_unit(hass,entity_id,new_unit_of_measurement='0.1' + UnitOfTemperature.CELSIUS, old_unit_of_measurement=unit)
-                    else:
-                        _LOGGER.debug("No unit change needed for %s", entity_id)
-                else:
-                    if unit!= UnitOfTemperature.CELSIUS:
-                        update_unit = (
-                            update(StatisticsMeta)
-                            .where(StatisticsMeta.statistic_id == entity_id)
-                            .values(
-                                unit_of_measurement=UnitOfTemperature.CELSIUS
-                            )
-                        )
-                        stats_result = session.execute(update_unit)
-                        _LOGGER.debug("Updated %s rows in Statistics", stats_result.rowcount)
-                        async_change_statistics_unit(hass,entity_id,new_unit_of_measurement=UnitOfTemperature.CELSIUS, old_unit_of_measurement=UnitOfTemperature.CELSIUS)
-                    else:
-                        _LOGGER.debug("No unit change needed for %s", entity_id)
-                return True
-
-        except Exception as e:
-            _LOGGER.error("Error in database operation for %s: %s", entity_id, str(e))
-            return False
+                stats_result = session.execute(update_unit)
+                _LOGGER.debug("Updated %s rows in StatisticsMeta", stats_result.rowcount)
+            return (True, unit)
 
     try:
-        result = recorder.async_add_executor_job(_update_celsius)
-        return result
+        found, unit = await recorder.async_add_executor_job(_update_celsius)
+        if not found:
+            _LOGGER.debug("No statistics metadata found for %s (new sensor)", entity_id)
+            return True
+
+        if decimal:
+            decimal_unit = '0.1' + UnitOfTemperature.CELSIUS
+            if unit != decimal_unit:
+                # Called from the event loop as required
+                async_change_statistics_unit(
+                    hass,
+                    entity_id,
+                    new_unit_of_measurement=decimal_unit,
+                    old_unit_of_measurement=unit,
+                )
+            else:
+                _LOGGER.debug("No unit change needed for %s", entity_id)
+        return True
     except Exception as e:
         _LOGGER.error("Could not update celsius for %s: %s", entity_id, str(e), exc_info=True)
         return False
@@ -505,7 +512,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def handle_hass_started(_event: Event) -> None:
         """Event handler for when HA has started."""
-        await hass.async_create_task(heatpump.setup_mqtt())
+        await heatpump.setup_mqtt()
 
     # One common ThermIQWorker serves all HeatPump objects
     if DOMAIN in hass.data:
@@ -518,17 +525,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Make config reload
     rld = entry.add_update_listener(reload_entry)
     entry.async_on_unload(rld)
-    hass.async_create_task(setup_input_numbers(heatpump))
-    hass.async_create_task(setup_input_selects(heatpump))
-    hass.async_create_task(setup_input_booleans(heatpump))
+
+    async def finish_setup() -> None:
+        """Create the input_* helper entities, then start MQTT."""
+        await setup_input_numbers(heatpump)
+        await setup_input_selects(heatpump)
+        await setup_input_booleans(heatpump)
+        if hass.is_running:
+            # HA is already up (e.g. the integration was just added via the
+            # UI) - EVENT_HOMEASSISTANT_STARTED has fired and never will
+            # again, so subscribe immediately
+            await heatpump.setup_mqtt()
+        else:
+            # Wait for hass to start before subscribing
+            hass.bus.async_listen_once(
+                EVENT_HOMEASSISTANT_STARTED, handle_hass_started
+            )
+
+    hass.async_create_task(finish_setup())
 
     # Load the platforms for heatpump
     hass.async_create_task(
         hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     )
-
-    # Wait for hass to start and then add the input_* entities
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, handle_hass_started)
 
     return True
 
@@ -538,6 +557,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         worker = hass.data[DOMAIN]
+        # Unsubscribe MQTT and remove the generated helper entities so a
+        # reload does not leak subscriptions or orphan input_* entities
+        heatpump = worker.heatpumps.get(entry.data[CONF_ID])
+        if heatpump is not None:
+            await heatpump.async_reset()
         worker.remove_entry(entry)
         if worker.is_idle():
             # also remove worker if not used by any entry any more
