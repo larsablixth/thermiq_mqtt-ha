@@ -1,9 +1,11 @@
 import logging, json
 
 from collections.abc import Callable
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components import mqtt
+from homeassistant.helpers.event import async_track_time_interval
 
 from ..const import (
     DOMAIN,
@@ -19,6 +21,12 @@ from ..const import (
 from .thermiq_regs import reg_id
 
 _LOGGER = logging.getLogger(__name__)
+
+# The ThermIQ bridge publishes a data message roughly every 30 s. If nothing is
+# received for this long the heatpump is considered unreachable and its entities
+# report unavailable. The watchdog re-checks on this interval.
+AVAILABILITY_TIMEOUT = timedelta(seconds=120)
+AVAILABILITY_CHECK_INTERVAL = timedelta(seconds=30)
 
 
 class HeatPump:
@@ -41,7 +49,10 @@ class HeatPump:
             _LOGGER.debug("Erroneous JSON: %s", message.payload)
             return
 
-        if not isinstance(json_dict, dict) or str(json_dict.get("Client_Name", ""))[:8] != "ThermIQ_":
+        if (
+            not isinstance(json_dict, dict)
+            or str(json_dict.get("Client_Name", ""))[:8] != "ThermIQ_"
+        ):
             _LOGGER.error("JSON result was not from ThermIQ-mqtt")
             return
 
@@ -54,7 +65,7 @@ class HeatPump:
                 kstore = k.lower()
                 dstore = k
                 if kstore == "evu":
-                    dstore = 'd300'
+                    dstore = "d300"
                 # # Create hex notation if incoming register is decimal format
                 # Named registers must be longer than 4 characters to avoid confusion
                 if k[0] == "d" and len(k) < 5:
@@ -89,12 +100,20 @@ class HeatPump:
         # compound onto an already combined value
         r01 = self._hpstate.get("r01")
         r02 = self._hpstate.get("r02")
-        if "r01" in received and isinstance(r01, (int, float)) and isinstance(r02, (int, float)):
+        if (
+            "r01" in received
+            and isinstance(r01, (int, float))
+            and isinstance(r02, (int, float))
+        ):
             self._hpstate["r01"] = r01 + r02 / 10
 
         r03 = self._hpstate.get("r03")
         r04 = self._hpstate.get("r04")
-        if "r03" in received and isinstance(r03, (int, float)) and isinstance(r04, (int, float)):
+        if (
+            "r03" in received
+            and isinstance(r03, (int, float))
+            and isinstance(r04, (int, float))
+        ):
             self._hpstate["r03"] = r03 + r04 / 10
 
         self._hpstate["mqtt_counter"] += 1
@@ -112,9 +131,11 @@ class HeatPump:
         if "app_info" in json_dict:
             self._hpstate["app_info"] = json_dict["app_info"]
 
-        self._hass.bus.fire(
-            self._domain + "_" + self._id + "_msg_rec_event", {}
-        )
+        # Record receipt time for the availability watchdog
+        self._last_message_time = self._hass.loop.time()
+        self._was_available = True
+
+        self._hass.bus.fire(self._domain + "_" + self._id + "_msg_rec_event", {})
 
     def __init__(self, hass, entry: ConfigEntry):
         self._hass = hass
@@ -124,6 +145,10 @@ class HeatPump:
         self._id = entry.data[CONF_ID]
         self._id_reg = {}
         self.unsubscribe_callback = None
+        self._watchdog_unsub = None
+        # Monotonic timestamp of the last message; None until the first one
+        self._last_message_time = None
+        self._was_available = False
 
         # Create reverse lookup dictionary (id_reg->reg_number)
         # Registers start as None (unknown) until the first MQTT message;
@@ -133,12 +158,34 @@ class HeatPump:
             self._hpstate[v[0]] = None
 
     async def setup_mqtt(self):
-        self._hpstate["time_str"] = self._data_topic
         self.unsubscribe_callback = await mqtt.async_subscribe(
             self._hass,
             self._data_topic,
             self.message_received,
         )
+        # Watchdog to flip entities to unavailable when messages stop arriving
+        if self._watchdog_unsub is None:
+            self._watchdog_unsub = async_track_time_interval(
+                self._hass,
+                self._availability_watchdog,
+                AVAILABILITY_CHECK_INTERVAL,
+            )
+
+    @property
+    def available(self) -> bool:
+        """True while recent data has been received from the heatpump."""
+        if self._last_message_time is None:
+            return False
+        return (
+            self._hass.loop.time() - self._last_message_time
+        ) < AVAILABILITY_TIMEOUT.total_seconds()
+
+    async def _availability_watchdog(self, _now):
+        """Notify entities when availability changes (e.g. comms lost)."""
+        available = self.available
+        if available != self._was_available:
+            self._was_available = available
+            self._hass.bus.fire(self._domain + "_" + self._id + "_msg_rec_event", {})
 
     async def update_config(self, entry):
         if self.unsubscribe_callback is not None:
@@ -175,10 +222,6 @@ class HeatPump:
         if self._hexFormat == True:
             _LOGGER.debug("INFO: Using HEX format")
 
-
-
-
-
     async def async_reset(self):
         """Reset this heatpump: unsubscribe from MQTT.
 
@@ -188,6 +231,9 @@ class HeatPump:
         if self.unsubscribe_callback is not None:
             self.unsubscribe_callback()
             self.unsubscribe_callback = None
+        if self._watchdog_unsub is not None:
+            self._watchdog_unsub()
+            self._watchdog_unsub = None
         return True
 
     @property
@@ -263,7 +309,5 @@ class HeatPump:
         _LOGGER.debug("topic:[%s]", topic)
         _LOGGER.debug("payload:[%s]", payload)
         self._hass.async_create_task(
-            mqtt.async_publish(
-                self._hass, topic, payload, qos=2, retain=False
-            )
+            mqtt.async_publish(self._hass, topic, payload, qos=2, retain=False)
         )

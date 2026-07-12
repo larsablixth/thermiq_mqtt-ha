@@ -17,7 +17,7 @@ from homeassistant.const import (
     UnitOfTemperature,
     PERCENTAGE,
     UnitOfElectricCurrent,
-    UnitOfTime
+    UnitOfTime,
 )
 
 from homeassistant.components.sensor import SensorDeviceClass
@@ -126,44 +126,54 @@ class HeatPumpSensor(SensorEntity):
         self._unit = vp_unit
 
         # Override for known types
-        if (vp_type in ["temperature_input","temperature"]) or (
+        if (vp_type in ["temperature_input", "temperature"]) or (
             vp_unit
             in [
-                "C","°C",
+                "C",
+                "°C",
             ]
         ):
             self._icon = "mdi:temperature-celsius"
-            self._unit =UnitOfTemperature.CELSIUS
+            self._unit = UnitOfTemperature.CELSIUS
             self._attr_state_class = SensorStateClass.MEASUREMENT
             self._attr_device_class = SensorDeviceClass.TEMPERATURE
 
-        elif (vp_type in ["time",] and (
+        elif vp_type in [
+            "time",
+        ] and (
             vp_unit
             in [
                 "h",
             ]
-            )):
+        ):
             self._attr_state_class = SensorStateClass.TOTAL_INCREASING
             self._attr_device_class = SensorDeviceClass.DURATION
             self._icon = "mdi:clock-star-four-points-outline"
-            self._unit =UnitOfTime.HOURS
+            self._unit = UnitOfTime.HOURS
 
-        elif (vp_type in ["sensor",]) and (
+        elif (
+            vp_type
+            in [
+                "sensor",
+            ]
+        ) and (
             vp_unit
             in [
                 "A",
             ]
-            ):
+        ):
             self._attr_state_class = SensorStateClass.MEASUREMENT
             self._attr_device_class = SensorDeviceClass.CURRENT
             self._icon = "mdi:flash"
-            self._unit =UnitOfElectricCurrent.AMPERE
+            self._unit = UnitOfElectricCurrent.AMPERE
 
-        elif (vp_unit in ["dBm",]):
+        elif vp_unit in [
+            "dBm",
+        ]:
             self._attr_state_class = SensorStateClass.MEASUREMENT
             self._attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
             self._icon = "mdi:wifi"
-            self._unit ='dBm'
+            self._unit = "dBm"
 
         elif vp_unit == "%":
             self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -178,9 +188,9 @@ class HeatPumpSensor(SensorEntity):
             # table's 's' on 'time' is misleading - the value is a timestamp).
             self._unit = None
 
-        elif (vp_type in [
+        elif vp_type in [
             "sensor_boolean",
-        ]):
+        ]:
             self._unit = ""
             self._icon = "mdi:alert"
         # "mdi:thermometer" ,"mdi:oil-temperature", "mdi:gauge", "mdi:speedometer", "mdi:alert"
@@ -192,23 +202,18 @@ class HeatPumpSensor(SensorEntity):
 
         # This is needed
         self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN,heatpump._id)},
+            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
             ATTR_NAME: "Heatpump status",
             ATTR_MANUFACTURER: MANUFACTURER,
             ATTR_MODEL: DEVVERSION,
             "entry_type": DeviceEntryType.SERVICE,
         }
 
-
-
     async def async_added_to_hass(self):
         """Register the update listener; removed automatically on unload."""
         self.async_on_remove(
             self.hass.bus.async_listen(
-                self._heatpump._domain
-                + "_"
-                + self._heatpump._id
-                + "_msg_rec_event",
+                self._heatpump._domain + "_" + self._heatpump._id + "_msg_rec_event",
                 self._async_update_event,
             )
         )
@@ -222,6 +227,11 @@ class HeatPumpSensor(SensorEntity):
     def should_poll(self):
         """No need to poll. Coordinator notifies entity of updates."""
         return False
+
+    @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
 
     @property
     def native_value(self):

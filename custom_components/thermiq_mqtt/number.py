@@ -5,6 +5,7 @@ built-in input_number platform via hass.data[CONF_ENTITY_PLATFORM] (an
 unsupported internal API). These are standard NumberEntity instances in the
 `number` domain and update from the shared heatpump state on the msg_rec_event.
 """
+
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberDeviceClass, NumberMode
@@ -59,9 +60,7 @@ class ThermIQNumber(NumberEntity):
 
         self.entity_id = f"number.{heatpump._domain}_{heatpump._id}_{key}"
         self._attr_unique_id = "uid-" + self.entity_id
-        self._attr_name = (
-            id_names[key][heatpump._langid] if key in id_names else key
-        )
+        self._attr_name = id_names[key][heatpump._langid] if key in id_names else key
         self._attr_native_min_value = reg_id[key][FIELD_MINVALUE]
         self._attr_native_max_value = reg_id[key][FIELD_MAXVALUE]
         self._attr_native_step = 0.1 if self._reg == "indr_t" else 1
@@ -84,6 +83,11 @@ class ThermIQNumber(NumberEntity):
         }
 
     @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
+
+    @property
     def native_value(self):
         """Current register value, or None until the first MQTT message."""
         value = self._hpstate.get(self._reg)
@@ -95,7 +99,9 @@ class ThermIQNumber(NumberEntity):
         """Write a new value to the heatpump."""
         # Only send once the heatpump has reported real data
         if self._heatpump._hpstate["mqtt_counter"] <= 0:
-            _LOGGER.debug("Ignoring set for %s: no data from heatpump yet", self.entity_id)
+            _LOGGER.debug(
+                "Ignoring set for %s: no data from heatpump yet", self.entity_id
+            )
             return
         if value != self._hpstate.get(self._reg):
             self._hpstate[self._reg] = value
