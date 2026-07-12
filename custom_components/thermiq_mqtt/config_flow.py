@@ -2,7 +2,6 @@
 import logging
 import voluptuous as vol
 from awesomeversion import AwesomeVersion
-from homeassistant import exceptions
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant import config_entries
 from homeassistant.const import __version__ as HAVERSION
@@ -26,17 +25,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 # ToDo:
-#   Add check of Nodename
-#   Select list of languages
 #   check ID to be spaceless+[a-z/A-Z/0-9]
-
-
-class InvalidPostalCode(exceptions.HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidDomainName(exceptions.HomeAssistantError):
-    """Error to indicate we cannot connect."""
 
 
 class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -97,17 +86,12 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             )
 
-            try:
-                id_name = user_input[CONF_ID]
-                unique_id = f"{DOMAIN}_{id_name}"
-                await self.async_set_unique_id(unique_id)
-                self._abort_if_unique_id_configured()
-            except:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=error_schema,
-                    errors={"base": "invalid_id"},
-                )
+            id_name = user_input[CONF_ID]
+            unique_id = f"{DOMAIN}_{id_name}"
+            # AbortFlow must propagate so a duplicate ID aborts with
+            # "already_configured" instead of a misleading form error
+            await self.async_set_unique_id(unique_id)
+            self._abort_if_unique_id_configured()
 
             try:
                 prefix = user_input[CONF_MQTT_NODE]
@@ -116,42 +100,32 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 elif prefix.endswith("/"):
                     prefix = prefix[:-1]
                 valid_subscribe_topic(f"{prefix}/#")
-            except:
+            except (vol.Invalid, HomeAssistantError):
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
                     errors={"base": "invalid_nodename"},
                 )
 
-            try:
-                lang = AVAILABLE_LANGUAGES.index(user_input[CONF_LANGUAGE])
-
-            except:
+            if user_input[CONF_LANGUAGE] not in AVAILABLE_LANGUAGES:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
                     errors={"base": "invalid_language"},
                 )
 
-            try:
-                return self.async_create_entry(
-                    title=unique_id,
-                    data={
-                        CONF_ID: id_name,
-                        CONF_MQTT_NODE: prefix,
-                        CONF_LANGUAGE: user_input[CONF_LANGUAGE],
-                        CONF_MQTT_HEX: user_input[CONF_MQTT_HEX],
-                        CONF_MQTT_DBG: user_input[CONF_MQTT_DBG],
-                        CONF_MIGRATE_DATA: user_input[CONF_MIGRATE_DATA],
-                    },
-                    options={},
-                )
-            except:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=error_schema,
-                    errors={"base": "creation_error"},
-                )
+            return self.async_create_entry(
+                title=unique_id,
+                data={
+                    CONF_ID: id_name,
+                    CONF_MQTT_NODE: prefix,
+                    CONF_LANGUAGE: user_input[CONF_LANGUAGE],
+                    CONF_MQTT_HEX: user_input[CONF_MQTT_HEX],
+                    CONF_MQTT_DBG: user_input[CONF_MQTT_DBG],
+                    CONF_MIGRATE_DATA: user_input[CONF_MIGRATE_DATA],
+                },
+                options={},
+            )
 
     @staticmethod
     @callback
@@ -233,15 +207,7 @@ class OptionsFlow(config_entries.OptionsFlow):
                 }
             )
 
-            try:
-                entryTitle = self.config_entry.title
-                id_name = self.config_entry.data[CONF_ID]
-            except:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=error_schema,
-                    errors={"base": "invalid_id"},
-                )
+            id_name = self.config_entry.data[CONF_ID]
 
             try:
                 prefix = user_input[CONF_MQTT_NODE]
@@ -251,45 +217,34 @@ class OptionsFlow(config_entries.OptionsFlow):
                     prefix = prefix[:-1]
                 valid_subscribe_topic(f"{prefix}/#")
 
-            except:
+            except (vol.Invalid, HomeAssistantError):
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
                     errors={"base": "invalid_nodename"},
                 )
 
-            try:
-                lang = AVAILABLE_LANGUAGES.index(user_input[CONF_LANGUAGE])
-
-            except:
+            if user_input[CONF_LANGUAGE] not in AVAILABLE_LANGUAGES:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=error_schema,
                     errors={"base": "invalid_language"},
                 )
 
-            try:
-                data = {
-                    CONF_ID: id_name,
-                    CONF_MQTT_NODE: prefix,
-                    CONF_LANGUAGE: user_input[CONF_LANGUAGE],
-                    CONF_MQTT_HEX: user_input[CONF_MQTT_HEX],
-                    CONF_MQTT_DBG: user_input[CONF_MQTT_DBG],
-                    CONF_MIGRATE_DATA: user_input[CONF_MIGRATE_DATA],
-                }
+            data = {
+                CONF_ID: id_name,
+                CONF_MQTT_NODE: prefix,
+                CONF_LANGUAGE: user_input[CONF_LANGUAGE],
+                CONF_MQTT_HEX: user_input[CONF_MQTT_HEX],
+                CONF_MQTT_DBG: user_input[CONF_MQTT_DBG],
+                CONF_MIGRATE_DATA: user_input[CONF_MIGRATE_DATA],
+            }
 
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry,
-                    data=data,
-                    options={},
-                )
+            self.hass.config_entries.async_update_entry(
+                self.config_entry,
+                data=data,
+                options={},
+            )
 
-                # This is the options entry, jeep it empty
-                return self.async_create_entry(title="", data={})
-
-            except:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=error_schema,
-                    errors={"base": "update_error"},
-                )
+            # This is the options entry, keep it empty
+            return self.async_create_entry(title="", data={})
