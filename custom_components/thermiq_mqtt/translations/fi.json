@@ -1,0 +1,45 @@
+{
+  "config": {
+    "flow_title": "ThermIQ MQTT",
+    "abort": {
+      "already_configured": "Annettu tunnus on jo käytössä."
+    },
+    "error": {
+      "invalid_nodename": "Annettu MQTT-solmun nimi ei kelpaa",
+      "creation_id": "Yksilöllinen tunnus ei ole yksilöllinen tai kelvollinen",
+      "creation_error": "Virhe päivitettäessä määritysobjektia",
+      "invalid_language": "Virhe luotaessa määritysobjektia"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "id_name": "Yksilöllinen tunnus",
+          "mqtt_node": "MQTT-solmun nimi",
+          "language": "Kieli",
+          "hexformat": "Käytä heksamuotoa MQTT-rekistereille",
+          "thermiq_dbg": "Ota MQTT-vianetsintä käyttöön (kirjoitukset ohjataan dbg-aiheeseen)",
+          "migrate_data": "Pyydä vanhojen tietojen siirtoa recorder-tietokannassa (voi kestää)"
+        },
+        "title": "Lämpöpumpun määritykset",
+        "description": "Määritä uusi ThermIQ_MQTT-instanssi"
+      }
+    }
+  },
+  "options": {
+    "abort": {
+      "already_configured": "Annettu tunnus on jo käytössä."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "mqtt_node": "MQTT-solmun nimi",
+          "language": "Kieli",
+          "hexformat": "Käytä heksamuotoa MQTT-rekistereille",
+          "thermiq_dbg": "Ota MQTT-vianetsintä käyttöön (kirjoitukset ohjataan dbg-aiheeseen)",
+          "migrate_data": "Pyydä vanhojen tietojen siirtoa recorder-tietokannassa (voi kestää)"
+        },
+        "title": "Asetukset"
+      }
+    }
+  }
+}
