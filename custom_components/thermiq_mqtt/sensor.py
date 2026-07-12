@@ -178,15 +178,6 @@ class HeatPumpSensor(SensorEntity):
         self._idx = device_id
         self._vp_reg = vp_reg
 
-        # self.device_class [temperature, voltage,
-        #self.state_class= measurement
-
-        # Listen for the ThermIQ rec event indicating new data
-        hass.bus.async_listen(
-            heatpump._domain + "_" + heatpump._id + "_msg_rec_event",
-            self._async_update_event,
-        )
-
         # This is needed
         self._attr_device_info = {
             ATTR_IDENTIFIERS: {(DOMAIN,heatpump._id)},
@@ -197,6 +188,18 @@ class HeatPumpSensor(SensorEntity):
         }
 
 
+
+    async def async_added_to_hass(self):
+        """Register the update listener; removed automatically on unload."""
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                self._heatpump._domain
+                + "_"
+                + self._heatpump._id
+                + "_msg_rec_event",
+                self._async_update_event,
+            )
+        )
 
     @property
     def name(self):
@@ -230,10 +233,9 @@ class HeatPumpSensor(SensorEntity):
 
     async def async_update(self):
         """Update the value of the entity."""
-        """Update the new state of the sensor."""
 
         _LOGGER.debug("update: " + self._idx)
-        self._state = self._hpstate.get_value(self._vp_reg)
+        self._state = self._hpstate.get(self._vp_reg)
         if self._state is None:
             _LOGGER.warning("Could not get data for %s", self._idx)
 
@@ -241,15 +243,10 @@ class HeatPumpSensor(SensorEntity):
         """Update the new state of the sensor."""
 
         _LOGGER.debug("event: " + self._idx)
-        state = self._hpstate[self._vp_reg]
+        state = self._hpstate.get(self._vp_reg)
         if state is None:
             _LOGGER.debug("Could not get data for %s", self._idx)
         if self._state != state:
             self._state = state
             self.async_schedule_update_ha_state()
             _LOGGER.debug("async_update_ha: %s", str(state))
-
-    @property
-    def device_class(self):
-        """Return the class of this device."""
-        return f"{DOMAIN}_HeatPumpSensor"
