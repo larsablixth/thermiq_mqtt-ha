@@ -1,4 +1,5 @@
 """Tests for HeatPump MQTT message handling and availability."""
+
 import json
 from unittest.mock import MagicMock
 
@@ -28,7 +29,14 @@ async def test_message_populates_state_and_combines_decimals():
     hp, hass = _make_heatpump()
     await hp.message_received(
         _message(
-            {"Client_Name": "ThermIQ_x", "r00": 21, "r01": 20, "r02": 5, "r03": 18, "r04": 3}
+            {
+                "Client_Name": "ThermIQ_x",
+                "r00": 21,
+                "r01": 20,
+                "r02": 5,
+                "r03": 18,
+                "r04": 3,
+            }
         )
     )
     assert hp._hpstate["r00"] == 21
@@ -63,7 +71,9 @@ async def test_invalid_json_does_not_raise():
 async def test_unknown_key_does_not_abort_processing():
     hp, _ = _make_heatpump()
     # 'dXX' makes int() fail; r00 must still be stored
-    await hp.message_received(_message({"Client_Name": "ThermIQ_x", "dXX": 1, "r00": 9}))
+    await hp.message_received(
+        _message({"Client_Name": "ThermIQ_x", "dXX": 1, "r00": 9})
+    )
     assert hp._hpstate["r00"] == 9
 
 

@@ -1,4 +1,5 @@
 """Fixtures for the ThermIQ MQTT tests."""
+
 import pytest
 
 

@@ -2,6 +2,7 @@
 
 These are pure-data checks and do not need a running Home Assistant.
 """
+
 from custom_components.thermiq_mqtt.heatpump.thermiq_regs import (
     reg_id,
     id_names,
@@ -36,7 +37,9 @@ def test_every_register_has_seven_fields():
 
 def test_register_types_are_known():
     for key, value in reg_id.items():
-        assert value[FIELD_REGTYPE] in VALID_TYPES, f"{key}: unknown type {value[FIELD_REGTYPE]}"
+        assert (
+            value[FIELD_REGTYPE] in VALID_TYPES
+        ), f"{key}: unknown type {value[FIELD_REGTYPE]}"
 
 
 def test_number_registers_have_ordered_numeric_bounds():
