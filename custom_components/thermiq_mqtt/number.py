@@ -13,17 +13,12 @@ import logging
 from homeassistant.components.number import NumberEntity, NumberDeviceClass, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    ATTR_IDENTIFIERS,
-    ATTR_MANUFACTURER,
-    ATTR_MODEL,
-    ATTR_NAME,
     UnitOfTemperature,
 )
 from homeassistant.core import Event, HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, MANUFACTURER, DEVVERSION
+from .const import DOMAIN
 from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_REGNUM,
@@ -85,14 +80,6 @@ class ThermIQNumber(NumberEntity):
         else:
             self._attr_native_unit_of_measurement = unit or None
             self._attr_icon = "mdi:gauge"
-
-        self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: f"ThermIQ {heatpump._id}",
-            ATTR_MANUFACTURER: MANUFACTURER,
-            ATTR_MODEL: DEVVERSION,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
 
     @property
     def available(self) -> bool:

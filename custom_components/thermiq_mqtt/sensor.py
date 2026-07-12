@@ -9,13 +9,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.const import (
-    ATTR_IDENTIFIERS,
-    ATTR_MANUFACTURER,
-    ATTR_MODEL,
-    ATTR_NAME,
-)
-from homeassistant.helpers.device_registry import DeviceEntryType
 from datetime import datetime
 from homeassistant.helpers.entity import Entity, async_generate_entity_id
 
@@ -31,8 +24,6 @@ from homeassistant.components.sensor import SensorDeviceClass
 
 from .const import (
     DOMAIN,
-    MANUFACTURER,
-    DEVVERSION,
     CONF_ID,
 )
 
@@ -220,15 +211,6 @@ class HeatPumpSensor(SensorEntity):
 
         self._idx = device_id
         self._vp_reg = vp_reg
-
-        # This is needed
-        self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: f"ThermIQ {heatpump._id}",
-            ATTR_MANUFACTURER: MANUFACTURER,
-            ATTR_MODEL: DEVVERSION,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
 
     async def async_added_to_hass(self) -> None:
         """Register the update listener; removed automatically on unload."""

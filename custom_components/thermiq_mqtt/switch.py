@@ -11,17 +11,10 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_IDENTIFIERS,
-    ATTR_MANUFACTURER,
-    ATTR_MODEL,
-    ATTR_NAME,
-)
 from homeassistant.core import Event, HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, MANUFACTURER, DEVVERSION
+from .const import DOMAIN
 from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_REGNUM,
@@ -67,14 +60,6 @@ class ThermIQSwitch(SwitchEntity):
         self.entity_id = f"switch.{heatpump._domain}_{heatpump._id}_{key}"
         self._attr_unique_id = "uid-" + self.entity_id
         self._attr_name = id_names[key][heatpump._langid] if key in id_names else key
-
-        self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: f"ThermIQ {heatpump._id}",
-            ATTR_MANUFACTURER: MANUFACTURER,
-            ATTR_MODEL: DEVVERSION,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
 
     @property
     def available(self) -> bool:
