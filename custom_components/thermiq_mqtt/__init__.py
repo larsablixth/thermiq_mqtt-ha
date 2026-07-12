@@ -542,12 +542,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 EVENT_HOMEASSISTANT_STARTED, handle_hass_started
             )
 
-    hass.async_create_task(finish_setup())
+    # Load the sensor/binary_sensor platforms and await them so the entities
+    # are fully set up before this entry is marked done (avoids races where
+    # consumers access the platform data before it is ready)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Load the platforms for heatpump
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    )
+    hass.async_create_task(finish_setup())
 
     return True
 
