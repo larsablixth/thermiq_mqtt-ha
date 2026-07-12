@@ -118,8 +118,12 @@ class HeatPumpSensor(SensorEntity):
         _LOGGER.debug("idx:" + device_id)
         self._name = friendly_name
         self._state = None
-        self._icon = None
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._icon = "mdi:gauge"
+        # Default: no state class. Only numeric sensors get MEASUREMENT /
+        # TOTAL_INCREASING - string sensors (time, communication_status,
+        # app_info, sw_version, ...) must not, or the recorder rejects them.
+        self._attr_state_class = None
+        self._unit = vp_unit
 
         # Override for known types
         if (vp_type in ["temperature_input","temperature"]) or (
@@ -152,9 +156,8 @@ class HeatPumpSensor(SensorEntity):
             ):
             self._attr_state_class = SensorStateClass.MEASUREMENT
             self._attr_device_class = SensorDeviceClass.CURRENT
-            self._icon = "mdi:clock-star-four-points-outline"
+            self._icon = "mdi:flash"
             self._unit =UnitOfElectricCurrent.AMPERE
-
 
         elif (vp_unit in ["dBm",]):
             self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -162,15 +165,24 @@ class HeatPumpSensor(SensorEntity):
             self._icon = "mdi:wifi"
             self._unit ='dBm'
 
+        elif vp_unit == "%":
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+            self._unit = PERCENTAGE
+
+        elif vp_unit == "Cmin":
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+
+        elif vp_type == "generated_sensor":
+            # time / time_str / communication_status / app_info / mqtt_counter /
+            # timestamp: informational text or a bare counter. No unit (the reg
+            # table's 's' on 'time' is misleading - the value is a timestamp).
+            self._unit = None
 
         elif (vp_type in [
             "sensor_boolean",
         ]):
             self._unit = ""
             self._icon = "mdi:alert"
-        else:
-            self._unit = vp_unit
-            self._icon = "mdi:gauge"
         # "mdi:thermometer" ,"mdi:oil-temperature", "mdi:gauge", "mdi:speedometer", "mdi:alert"
         self._entity_picture = None
         self._available = True
@@ -223,8 +235,12 @@ class HeatPumpSensor(SensorEntity):
 
     @property
     def native_unit_of_measurement(self):
-        """Return the native unit of measurement."""
-        return self._unit
+        """Return the native unit of measurement (None for text sensors).
+
+        An empty string would make HA treat the sensor as numeric and the
+        recorder would reject text values, so normalise "" to None.
+        """
+        return self._unit or None
 
     @property
     def icon(self):
