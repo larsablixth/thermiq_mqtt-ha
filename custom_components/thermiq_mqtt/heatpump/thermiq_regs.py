@@ -1,4 +1,8 @@
 # ThermIQ generated register definitions
+from __future__ import annotations
+
+from typing import Any
+
 FIELD_REGNUM = 0
 FIELD_REGTYPE = 1
 FIELD_UNIT = 2
@@ -8,7 +12,7 @@ FIELD_BITMASK = 3
 
 
 # Register as sensors
-reg_id = {
+reg_id: dict[str, list[Any]] = {
     #  reg_id          : ['reg#', 'type', 'unit', 'bitmask or min', 'max', 'panel', panel_order' ],
     "outdoor_t": ["r00", "temperature", "°C", "", "", 2, 1],
     "indoor_t": ["r01", "temperature", "°C", "", "", 2, 2],
@@ -162,7 +166,7 @@ reg_id = {
 
 # Translation dictionary
 #  ['en', 'se', 'fi', 'no', 'de']
-id_names = {
+id_names: dict[str, list[str]] = {
     "outdoor_t": [
         "Outdoor temp.",
         "Utomhustemp.",

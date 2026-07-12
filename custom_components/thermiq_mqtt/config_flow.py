@@ -30,7 +30,7 @@ _LOGGER = logging.getLogger(__name__)
 #   check ID to be spaceless+[a-z/A-Z/0-9]
 
 
-class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Component config flow."""
 
     VERSION = 2

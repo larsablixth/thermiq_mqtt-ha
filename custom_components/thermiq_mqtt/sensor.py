@@ -1,15 +1,14 @@
+from __future__ import annotations
+
 import logging
-from homeassistant.core import HomeAssistant, callback
+from typing import Any
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.const import (
-    ATTR_IDENTIFIERS,
-    ATTR_MANUFACTURER,
-    ATTR_MODEL,
-    ATTR_NAME,
-)
-from homeassistant.helpers.device_registry import DeviceEntryType
 from datetime import datetime
 from homeassistant.helpers.entity import Entity, async_generate_entity_id
 
@@ -25,11 +24,10 @@ from homeassistant.components.sensor import SensorDeviceClass
 
 from .const import (
     DOMAIN,
-    MANUFACTURER,
-    DEVVERSION,
     CONF_ID,
 )
 
+from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_BITMASK,
     FIELD_MAXVALUE,
@@ -45,8 +43,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass, config_entry, async_add_entities, discovery_info=None
-):
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+    discovery_info=None,
+) -> None:
     """Set up platform for a new integration.
 
     Called by the HA framework after async_setup_platforms has been called
@@ -103,9 +104,20 @@ async def async_setup_entry(
 class HeatPumpSensor(SensorEntity):
     """Common functionality for all entities."""
 
+    # Use the entity name as-is; never prefix it with the device name
+    # (long names get truncated in the mobile app)
+    _attr_has_entity_name = False
+
     def __init__(
-        self, hass, heatpump, device_id, vp_reg, friendly_name, vp_type, vp_unit
-    ):
+        self,
+        hass: HomeAssistant,
+        heatpump: HeatPump,
+        device_id: str,
+        vp_reg: str,
+        friendly_name: str,
+        vp_type: str,
+        vp_unit: str,
+    ) -> None:
         self.hass = hass
         self._heatpump = heatpump
         self._hpstate = heatpump._hpstate
@@ -123,7 +135,7 @@ class HeatPumpSensor(SensorEntity):
         # TOTAL_INCREASING - string sensors (time, communication_status,
         # app_info, sw_version, ...) must not, or the recorder rejects them.
         self._attr_state_class = None
-        self._unit = vp_unit
+        self._unit: str | None = vp_unit
 
         # Override for known types
         if (vp_type in ["temperature_input", "temperature"]) or (
@@ -200,16 +212,7 @@ class HeatPumpSensor(SensorEntity):
         self._idx = device_id
         self._vp_reg = vp_reg
 
-        # This is needed
-        self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: "Heatpump status",
-            ATTR_MANUFACTURER: MANUFACTURER,
-            ATTR_MODEL: DEVVERSION,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
-
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Register the update listener; removed automatically on unload."""
         self.async_on_remove(
             self.hass.bus.async_listen(
@@ -219,32 +222,32 @@ class HeatPumpSensor(SensorEntity):
         )
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the name of the sensor."""
         return self._name
 
     @property
-    def should_poll(self):
+    def should_poll(self) -> bool:
         """No need to poll. Coordinator notifies entity of updates."""
         return False
 
     @property
-    def available(self):
+    def available(self) -> bool:
         """Unavailable until the first message and while the pump is silent."""
         return self._heatpump.available
 
     @property
-    def native_value(self):
+    def native_value(self) -> Any:
         """Return the native value of the sensor."""
         return self._state
 
     @property
-    def vp_reg(self):
+    def vp_reg(self) -> str:
         """Return the register of the sensor."""
         return self._vp_reg
 
     @property
-    def native_unit_of_measurement(self):
+    def native_unit_of_measurement(self) -> str | None:
         """Return the native unit of measurement (None for text sensors).
 
         An empty string would make HA treat the sensor as numeric and the
@@ -253,11 +256,11 @@ class HeatPumpSensor(SensorEntity):
         return self._unit or None
 
     @property
-    def icon(self):
+    def icon(self) -> str:
         """Return the icon of the sensor."""
         return self._icon
 
-    async def async_update(self):
+    async def async_update(self) -> None:
         """Update the value of the entity."""
 
         _LOGGER.debug("update: " + self._idx)
@@ -265,14 +268,15 @@ class HeatPumpSensor(SensorEntity):
         if self._state is None:
             _LOGGER.warning("Could not get data for %s", self._idx)
 
-    async def _async_update_event(self, event):
+    async def _async_update_event(self, event: Event) -> None:
         """Update the new state of the sensor."""
 
         _LOGGER.debug("event: " + self._idx)
         state = self._hpstate.get(self._vp_reg)
         if state is None:
             _LOGGER.debug("Could not get data for %s", self._idx)
-        if self._state != state:
-            self._state = state
-            self.async_write_ha_state()
-            _LOGGER.debug("async_update_ha: %s", str(state))
+        self._state = state
+        # Always write, even when the value is unchanged: availability
+        # transitions must reach the state machine too, otherwise an entity
+        # whose register never updates stays stuck at 'unavailable'
+        self.async_write_ha_state()

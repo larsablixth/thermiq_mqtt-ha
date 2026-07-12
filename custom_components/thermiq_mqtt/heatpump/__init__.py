@@ -1,10 +1,15 @@
-import logging, json
+from __future__ import annotations
+
+import json
+import logging
 
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components import mqtt
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 
 from ..const import (
@@ -18,7 +23,12 @@ from ..const import (
 )
 
 # import ThermIQ register defines
-from .thermiq_regs import reg_id
+from .thermiq_regs import (
+    FIELD_MAXVALUE,
+    FIELD_MINVALUE,
+    FIELD_REGTYPE,
+    reg_id,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,18 +38,34 @@ _LOGGER = logging.getLogger(__name__)
 AVAILABILITY_TIMEOUT = timedelta(seconds=120)
 AVAILABILITY_CHECK_INTERVAL = timedelta(seconds=30)
 
+# Register types whose min/max fields are true numeric bounds. For
+# generated_input_boolean the same table slot holds the bitmask, so it is
+# validated separately (only 0/1 allowed).
+BOUNDED_REGTYPES = {
+    "temperature_input",
+    "time_input",
+    "sensor_input",
+    "generated_input",
+    "select_input",
+}
+
 
 class HeatPump:
 
-    _dbg = True
-    _mqtt_base = ""
-    _hexFormat = False
-    _langid = 0
+    _dbg: bool = True
+    _mqtt_base: str = ""
+    _hexFormat: bool = False
+    _langid: int = 0
+    _data_topic: str = ""
+    _cmd_topic: str = ""
+    _set_topic: str = ""
+    # Monotonic timestamp of the last message; None until the first one
+    _last_message_time: float | None = None
 
-    unsubscribe_callback: Callable[[], None]
+    unsubscribe_callback: Callable[[], None] | None
 
     # ###
-    async def message_received(self, message):
+    async def message_received(self, message: mqtt.ReceiveMessage) -> None:
         """Handle new MQTT messages."""
         _LOGGER.debug("%s: message.payload:[%s]", self._id, message.payload)
         try:
@@ -137,16 +163,15 @@ class HeatPump:
 
         self._hass.bus.fire(self._domain + "_" + self._id + "_msg_rec_event", {})
 
-    def __init__(self, hass, entry: ConfigEntry):
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self._hass = hass
         self._entry = entry
-        self._hpstate = {}
+        self._hpstate: dict[str, Any] = {}
         self._domain = DOMAIN
-        self._id = entry.data[CONF_ID]
-        self._id_reg = {}
+        self._id: str = entry.data[CONF_ID]
+        self._id_reg: dict[str, str] = {}
         self.unsubscribe_callback = None
-        self._watchdog_unsub = None
-        # Monotonic timestamp of the last message; None until the first one
+        self._watchdog_unsub: Callable[[], None] | None = None
         self._last_message_time = None
         self._was_available = False
 
@@ -157,7 +182,7 @@ class HeatPump:
             self._id_reg[v[0]] = k
             self._hpstate[v[0]] = None
 
-    async def setup_mqtt(self):
+    async def setup_mqtt(self) -> None:
         self.unsubscribe_callback = await mqtt.async_subscribe(
             self._hass,
             self._data_topic,
@@ -176,18 +201,19 @@ class HeatPump:
         """True while recent data has been received from the heatpump."""
         if self._last_message_time is None:
             return False
-        return (
-            self._hass.loop.time() - self._last_message_time
-        ) < AVAILABILITY_TIMEOUT.total_seconds()
+        return bool(
+            (self._hass.loop.time() - self._last_message_time)
+            < AVAILABILITY_TIMEOUT.total_seconds()
+        )
 
-    async def _availability_watchdog(self, _now):
+    async def _availability_watchdog(self, _now: datetime) -> None:
         """Notify entities when availability changes (e.g. comms lost)."""
         available = self.available
         if available != self._was_available:
             self._was_available = available
             self._hass.bus.fire(self._domain + "_" + self._id + "_msg_rec_event", {})
 
-    async def update_config(self, entry):
+    async def update_config(self, entry: ConfigEntry) -> None:
         if self.unsubscribe_callback is not None:
             self.unsubscribe_callback()
         lang = entry.data[CONF_LANGUAGE]
@@ -222,7 +248,7 @@ class HeatPump:
         if self._hexFormat == True:
             _LOGGER.debug("INFO: Using HEX format")
 
-    async def async_reset(self):
+    async def async_reset(self) -> bool:
         """Reset this heatpump: unsubscribe from MQTT.
 
         The number/select/switch/sensor/binary_sensor entities are removed by
@@ -237,21 +263,21 @@ class HeatPump:
         return True
 
     @property
-    def hpstate(self):
+    def hpstate(self) -> dict[str, Any]:
         return self._hpstate
 
-    def set_value(self, item, value):
+    def set_value(self, item: str, value: Any) -> None:
         """Set value for sensor."""
         _LOGGER.debug("set_value(" + item + ")=" + str(value))
         self._hpstate[item] = value
 
-    def get_value(self, item):
+    def get_value(self, item: str) -> Any:
         """Get value for sensor."""
         res = self._hpstate.get(item)
         _LOGGER.debug("get_value(%s)=%s", item, res)
         return res
 
-    def update_state(self, command, state_command):
+    def update_state(self, command: str, state_command: str) -> None:
         """Send MQTT message to ThermIQ."""
         _LOGGER.debug("update_state:" + command + " " + state_command)
         # self._data[state_command] = self._client.command(command)
@@ -265,7 +291,9 @@ class HeatPump:
     # Write a specific value_id with data; value_id is translated to a register
     # number. Used by the number/select/switch entities to write to the pump.
 
-    async def send_mqtt_reg(self, register_id, value, bitmask) -> None:
+    async def send_mqtt_reg(
+        self, register_id: str, value: Any, bitmask: int | None
+    ) -> None:
         """Service to send a message."""
 
         register = reg_id[register_id][0]
@@ -288,6 +316,33 @@ class HeatPump:
         if not (register in self._id_reg):
             _LOGGER.error("No MQTT message sent due to unknown register:[%s]", register)
             return
+
+        # Defense in depth: never publish a value the register table does not
+        # allow, regardless of what the caller (UI, automation, service call)
+        # asked for. The pump itself does not range-check writes.
+        regtype = reg_id[register_id][FIELD_REGTYPE]
+        if regtype == "generated_input_boolean":
+            if value not in (0, 1):
+                _LOGGER.error(
+                    "No MQTT message sent: value [%s] for boolean register [%s] "
+                    "must be 0 or 1",
+                    value,
+                    register_id,
+                )
+                return
+        elif regtype in BOUNDED_REGTYPES:
+            min_value = reg_id[register_id][FIELD_MINVALUE]
+            max_value = reg_id[register_id][FIELD_MAXVALUE]
+            if not (min_value <= value <= max_value):
+                _LOGGER.error(
+                    "No MQTT message sent: value [%s] for register [%s] is "
+                    "outside the allowed range [%s..%s]",
+                    value,
+                    register_id,
+                    min_value,
+                    max_value,
+                )
+                return
 
         # Lets use the decimal register notation in the MQTT message towards ThermIQ-MQTT to improve human readability
 

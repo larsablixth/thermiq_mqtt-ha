@@ -1,26 +1,23 @@
+from __future__ import annotations
+
 import logging
-from homeassistant.core import HomeAssistant, callback
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
-from homeassistant.const import (
-    ATTR_IDENTIFIERS,
-    ATTR_MANUFACTURER,
-    ATTR_MODEL,
-    ATTR_NAME,
-)
 
-from homeassistant.helpers.device_registry import DeviceEntryType
 
 from .const import (
     DOMAIN,
-    MANUFACTURER,
-    DEVVERSION,
     CONF_ID,
 )
 
 
+from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_BITMASK,
     FIELD_MAXVALUE,
@@ -37,8 +34,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass, config_entry, async_add_entities, discovery_info=None
-):
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+    discovery_info=None,
+) -> None:
     """Set up platform for a new integration.
     Called by the HA framework after async_setup_platforms has been called
     during initialization of a new integration.
@@ -83,7 +83,18 @@ async def async_setup_entry(
 class HeatPumpBinarySensor(BinarySensorEntity):
     """Common functionality for all entities."""
 
-    def __init__(self, hass, heatpump, device_id, vp_reg, friendly_name, bitmask):
+    # Use the entity name as-is; never prefix it with the device name
+    _attr_has_entity_name = False
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        heatpump: HeatPump,
+        device_id: str,
+        vp_reg: str,
+        friendly_name: str,
+        bitmask: int,
+    ) -> None:
         self.hass = hass
         self._heatpump = heatpump
         self._hpstate = heatpump._hpstate
@@ -96,7 +107,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         _LOGGER.debug("entity_id:" + self.entity_id)
         _LOGGER.debug("idx:" + device_id)
         self._name = friendly_name
-        self._state = None
+        self._state: bool | None = None
         self._attr_is_on = False
         self._icon = "mdi:flash-outline"
 
@@ -112,16 +123,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         except (TypeError, ValueError):
             self._sorter = 256 * 65536
 
-        # This is needed
-        self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: "Heatpump status",
-            ATTR_MANUFACTURER: MANUFACTURER,
-            ATTR_MODEL: DEVVERSION,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
-
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Register the update listener; removed automatically on unload."""
         self.async_on_remove(
             self.hass.bus.async_listen(
@@ -131,36 +133,36 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         )
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the name of the sensor."""
         return self._name
 
     @property
-    def should_poll(self):
+    def should_poll(self) -> bool:
         """No need to poll. Coordinator notifies entity of updates."""
         return False
 
     @property
-    def available(self):
+    def available(self) -> bool:
         """Unavailable until the first message and while the pump is silent."""
         return self._heatpump.available
 
     @property
-    def vp_reg(self):
+    def vp_reg(self) -> str:
         """Return the register of the sensor."""
         return self._vp_reg
 
     @property
-    def sorter(self):
+    def sorter(self) -> int:
         """Return the sort key of the sensor."""
         return self._sorter
 
     @property
-    def icon(self):
+    def icon(self) -> str:
         """Return the icon of the sensor."""
         return self._icon
 
-    async def async_update(self):
+    async def async_update(self) -> None:
         """Update the new state of the sensor."""
 
         _LOGGER.debug("update: " + self._idx)
@@ -171,7 +173,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
             self._state = (int(reg_state) & self._bitmask) > 0
             self._attr_is_on = self._state
 
-    async def _async_update_event(self, event):
+    async def _async_update_event(self, event: Event) -> None:
         """Update the new state of the sensor."""
 
         _LOGGER.debug("event: " + self._idx)
@@ -188,8 +190,8 @@ class HeatPumpBinarySensor(BinarySensorEntity):
                 _LOGGER.debug("Non-numeric data for %s: [%s]", self._idx, reg_state)
                 bool_state = None
 
-        if self._state != bool_state:
-            self._state = bool_state
-            self._attr_is_on = bool(bool_state)
-            self.async_write_ha_state()
-            _LOGGER.debug("async_update_ha: %s: [%s]", self._idx, str(bool_state))
+        self._state = bool_state
+        self._attr_is_on = bool(bool_state)
+        # Always write, even when the value is unchanged: availability
+        # transitions must reach the state machine too
+        self.async_write_ha_state()

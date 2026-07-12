@@ -4,19 +4,18 @@ Replaces injection into Home Assistant's built-in input_boolean platform.
 Standard SwitchEntity instances in the `switch` domain (e.g. EVU block).
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import (
-    ATTR_IDENTIFIERS,
-    ATTR_MANUFACTURER,
-    ATTR_MODEL,
-    ATTR_NAME,
-)
-from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import Event, HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, MANUFACTURER, DEVVERSION
+from .const import DOMAIN
+from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_REGNUM,
     FIELD_REGTYPE,
@@ -28,7 +27,11 @@ from .heatpump.thermiq_regs import (
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
     """Set up the ThermIQ switch entities for a config entry."""
     heatpump = hass.data[DOMAIN].heatpumps[config_entry.data["id_name"]]
     entities = [
@@ -44,8 +47,10 @@ class ThermIQSwitch(SwitchEntity):
 
     _attr_should_poll = False
     _attr_icon = "mdi:transmission-tower"
+    # Use the entity name as-is; never prefix it with the device name
+    _attr_has_entity_name = False
 
-    def __init__(self, heatpump, key):
+    def __init__(self, heatpump: HeatPump, key: str) -> None:
         self._heatpump = heatpump
         self._hpstate = heatpump._hpstate
         self._key = key
@@ -56,23 +61,17 @@ class ThermIQSwitch(SwitchEntity):
         self._attr_unique_id = "uid-" + self.entity_id
         self._attr_name = id_names[key][heatpump._langid] if key in id_names else key
 
-        self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: "Heatpump status",
-            ATTR_MANUFACTURER: MANUFACTURER,
-            ATTR_MODEL: DEVVERSION,
-            "entry_type": DeviceEntryType.SERVICE,
-        }
-
     @property
-    def available(self):
+    def available(self) -> bool:
         """Unavailable until the first message and while the pump is silent."""
         return self._heatpump.available
 
     @property
-    def is_on(self):
+    def is_on(self) -> bool | None:
         """Return True/False, or None until the first MQTT message."""
         value = self._hpstate.get(self._reg)
+        if value is None:
+            return None
         try:
             return (int(value) & int(self._bitmask)) > 0
         except (TypeError, ValueError):
@@ -96,7 +95,7 @@ class ThermIQSwitch(SwitchEntity):
             )
             await self._heatpump.send_mqtt_reg(self._key, value, 0xFFFF)
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         self.async_on_remove(
             self.hass.bus.async_listen(
                 f"{self._heatpump._domain}_{self._heatpump._id}_msg_rec_event",
@@ -104,5 +103,5 @@ class ThermIQSwitch(SwitchEntity):
             )
         )
 
-    async def _async_update_event(self, event):
+    async def _async_update_event(self, event: Event) -> None:
         self.async_write_ha_state()
