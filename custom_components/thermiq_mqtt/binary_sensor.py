@@ -145,6 +145,11 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         return False
 
     @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
+
+    @property
     def vp_reg(self):
         """Return the register of the sensor."""
         return self._vp_reg

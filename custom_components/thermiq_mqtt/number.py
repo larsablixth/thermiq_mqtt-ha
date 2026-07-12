@@ -84,6 +84,11 @@ class ThermIQNumber(NumberEntity):
         }
 
     @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
+
+    @property
     def native_value(self):
         """Current register value, or None until the first MQTT message."""
         value = self._hpstate.get(self._reg)

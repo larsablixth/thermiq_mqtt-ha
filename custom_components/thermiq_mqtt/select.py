@@ -73,6 +73,11 @@ class ThermIQSelect(SelectEntity):
         }
 
     @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
+
+    @property
     def current_option(self):
         """Return the current option, or None if unknown/unmapped."""
         value = self._hpstate.get(self._reg)

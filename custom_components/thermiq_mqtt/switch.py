@@ -66,6 +66,11 @@ class ThermIQSwitch(SwitchEntity):
         }
 
     @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
+
+    @property
     def is_on(self):
         """Return True/False, or None until the first MQTT message."""
         value = self._hpstate.get(self._reg)

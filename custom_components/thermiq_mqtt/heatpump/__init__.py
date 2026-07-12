@@ -1,9 +1,11 @@
 import logging, json
 
 from collections.abc import Callable
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components import mqtt
+from homeassistant.helpers.event import async_track_time_interval
 
 from ..const import (
     DOMAIN,
@@ -19,6 +21,12 @@ from ..const import (
 from .thermiq_regs import reg_id
 
 _LOGGER = logging.getLogger(__name__)
+
+# The ThermIQ bridge publishes a data message roughly every 30 s. If nothing is
+# received for this long the heatpump is considered unreachable and its entities
+# report unavailable. The watchdog re-checks on this interval.
+AVAILABILITY_TIMEOUT = timedelta(seconds=120)
+AVAILABILITY_CHECK_INTERVAL = timedelta(seconds=30)
 
 
 class HeatPump:
@@ -112,6 +120,10 @@ class HeatPump:
         if "app_info" in json_dict:
             self._hpstate["app_info"] = json_dict["app_info"]
 
+        # Record receipt time for the availability watchdog
+        self._last_message_time = self._hass.loop.time()
+        self._was_available = True
+
         self._hass.bus.fire(
             self._domain + "_" + self._id + "_msg_rec_event", {}
         )
@@ -124,6 +136,10 @@ class HeatPump:
         self._id = entry.data[CONF_ID]
         self._id_reg = {}
         self.unsubscribe_callback = None
+        self._watchdog_unsub = None
+        # Monotonic timestamp of the last message; None until the first one
+        self._last_message_time = None
+        self._was_available = False
 
         # Create reverse lookup dictionary (id_reg->reg_number)
         # Registers start as None (unknown) until the first MQTT message;
@@ -133,12 +149,34 @@ class HeatPump:
             self._hpstate[v[0]] = None
 
     async def setup_mqtt(self):
-        self._hpstate["time_str"] = self._data_topic
         self.unsubscribe_callback = await mqtt.async_subscribe(
             self._hass,
             self._data_topic,
             self.message_received,
         )
+        # Watchdog to flip entities to unavailable when messages stop arriving
+        if self._watchdog_unsub is None:
+            self._watchdog_unsub = async_track_time_interval(
+                self._hass,
+                self._availability_watchdog,
+                AVAILABILITY_CHECK_INTERVAL,
+            )
+
+    @property
+    def available(self) -> bool:
+        """True while recent data has been received from the heatpump."""
+        if self._last_message_time is None:
+            return False
+        return (
+            self._hass.loop.time() - self._last_message_time
+        ) < AVAILABILITY_TIMEOUT.total_seconds()
+
+    async def _availability_watchdog(self, _now):
+        """Notify entities when availability changes (e.g. comms lost)."""
+        available = self.available
+        if available != self._was_available:
+            self._was_available = available
+            self._hass.bus.fire(self._domain + "_" + self._id + "_msg_rec_event", {})
 
     async def update_config(self, entry):
         if self.unsubscribe_callback is not None:
@@ -188,6 +226,9 @@ class HeatPump:
         if self.unsubscribe_callback is not None:
             self.unsubscribe_callback()
             self.unsubscribe_callback = None
+        if self._watchdog_unsub is not None:
+            self._watchdog_unsub()
+            self._watchdog_unsub = None
         return True
 
     @property

@@ -224,6 +224,11 @@ class HeatPumpSensor(SensorEntity):
         return False
 
     @property
+    def available(self):
+        """Unavailable until the first message and while the pump is silent."""
+        return self._heatpump.available
+
+    @property
     def native_value(self):
         """Return the native value of the sensor."""
         return self._state
