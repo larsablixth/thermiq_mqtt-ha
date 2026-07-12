@@ -1,4 +1,5 @@
 """Config flow"""
+
 import logging
 import re
 import voluptuous as vol
@@ -41,7 +42,7 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input=None):
 
-        DATA_SCHEMA  = vol.Schema(
+        DATA_SCHEMA = vol.Schema(
             {
                 vol.Required(CONF_ID, default="vp1"): cv.string,
                 vol.Required(CONF_MQTT_NODE, default="ThermIQ/ThermIQ-mqtt"): cv.string,
@@ -183,7 +184,8 @@ class OptionsFlow(config_entries.OptionsFlow):
                     CONF_MQTT_DBG, default=self.config_entry.data.get(CONF_MQTT_DBG)
                 ): cv.boolean,
                 vol.Required(
-                    CONF_MIGRATE_DATA, default=self.config_entry.data.get(CONF_MIGRATE_DATA, False)
+                    CONF_MIGRATE_DATA,
+                    default=self.config_entry.data.get(CONF_MIGRATE_DATA, False),
                 ): cv.boolean,
             }
         )

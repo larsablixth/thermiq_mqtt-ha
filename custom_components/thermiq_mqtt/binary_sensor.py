@@ -97,7 +97,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         _LOGGER.debug("idx:" + device_id)
         self._name = friendly_name
         self._state = None
-        self._attr_is_on=False
+        self._attr_is_on = False
         self._icon = "mdi:flash-outline"
 
         self._entity_picture = None
@@ -114,22 +114,18 @@ class HeatPumpBinarySensor(BinarySensorEntity):
 
         # This is needed
         self._attr_device_info = {
-            ATTR_IDENTIFIERS: {(DOMAIN,heatpump._id)},
+            ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
             ATTR_NAME: "Heatpump status",
             ATTR_MANUFACTURER: MANUFACTURER,
             ATTR_MODEL: DEVVERSION,
             "entry_type": DeviceEntryType.SERVICE,
         }
 
-
     async def async_added_to_hass(self):
         """Register the update listener; removed automatically on unload."""
         self.async_on_remove(
             self.hass.bus.async_listen(
-                self._heatpump._domain
-                + "_"
-                + self._heatpump._id
-                + "_msg_rec_event",
+                self._heatpump._domain + "_" + self._heatpump._id + "_msg_rec_event",
                 self._async_update_event,
             )
         )
@@ -179,7 +175,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         """Update the new state of the sensor."""
 
         _LOGGER.debug("event: " + self._idx)
-        if self._vp_reg=='evu':
+        if self._vp_reg == "evu":
             _LOGGER.debug("EVU reg state read special")
         reg_state = self._hpstate.get(self._vp_reg)
         if reg_state is None:
@@ -196,4 +192,4 @@ class HeatPumpBinarySensor(BinarySensorEntity):
             self._state = bool_state
             self._attr_is_on = bool(bool_state)
             self.async_write_ha_state()
-            _LOGGER.debug("async_update_ha: %s: [%s]",self._idx, str(bool_state))
+            _LOGGER.debug("async_update_ha: %s: [%s]", self._idx, str(bool_state))

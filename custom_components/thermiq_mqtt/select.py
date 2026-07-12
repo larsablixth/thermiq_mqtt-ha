@@ -3,6 +3,7 @@
 Replaces injection into Home Assistant's built-in input_select platform.
 Standard SelectEntity instances in the `select` domain.
 """
+
 import logging
 
 from homeassistant.components.select import SelectEntity
@@ -52,9 +53,7 @@ class ThermIQSelect(SelectEntity):
 
         self.entity_id = f"select.{heatpump._domain}_{heatpump._id}_{key}"
         self._attr_unique_id = "uid-" + self.entity_id
-        self._attr_name = (
-            id_names[key][heatpump._langid] if key in id_names else key
-        )
+        self._attr_name = id_names[key][heatpump._langid] if key in id_names else key
         # Map option label -> numeric value, e.g. "2 - Heatpump only" -> 2
         self._value_by_option = {
             f"{v} - {id_names[f'mode{v}'][heatpump._langid]}": v

@@ -3,6 +3,7 @@
 Replaces injection into Home Assistant's built-in input_boolean platform.
 Standard SwitchEntity instances in the `switch` domain (e.g. EVU block).
 """
+
 import logging
 from typing import Any
 
@@ -53,9 +54,7 @@ class ThermIQSwitch(SwitchEntity):
 
         self.entity_id = f"switch.{heatpump._domain}_{heatpump._id}_{key}"
         self._attr_unique_id = "uid-" + self.entity_id
-        self._attr_name = (
-            id_names[key][heatpump._langid] if key in id_names else key
-        )
+        self._attr_name = id_names[key][heatpump._langid] if key in id_names else key
 
         self._attr_device_info = {
             ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},

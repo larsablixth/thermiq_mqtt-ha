@@ -49,7 +49,10 @@ class HeatPump:
             _LOGGER.debug("Erroneous JSON: %s", message.payload)
             return
 
-        if not isinstance(json_dict, dict) or str(json_dict.get("Client_Name", ""))[:8] != "ThermIQ_":
+        if (
+            not isinstance(json_dict, dict)
+            or str(json_dict.get("Client_Name", ""))[:8] != "ThermIQ_"
+        ):
             _LOGGER.error("JSON result was not from ThermIQ-mqtt")
             return
 
@@ -62,7 +65,7 @@ class HeatPump:
                 kstore = k.lower()
                 dstore = k
                 if kstore == "evu":
-                    dstore = 'd300'
+                    dstore = "d300"
                 # # Create hex notation if incoming register is decimal format
                 # Named registers must be longer than 4 characters to avoid confusion
                 if k[0] == "d" and len(k) < 5:
@@ -97,12 +100,20 @@ class HeatPump:
         # compound onto an already combined value
         r01 = self._hpstate.get("r01")
         r02 = self._hpstate.get("r02")
-        if "r01" in received and isinstance(r01, (int, float)) and isinstance(r02, (int, float)):
+        if (
+            "r01" in received
+            and isinstance(r01, (int, float))
+            and isinstance(r02, (int, float))
+        ):
             self._hpstate["r01"] = r01 + r02 / 10
 
         r03 = self._hpstate.get("r03")
         r04 = self._hpstate.get("r04")
-        if "r03" in received and isinstance(r03, (int, float)) and isinstance(r04, (int, float)):
+        if (
+            "r03" in received
+            and isinstance(r03, (int, float))
+            and isinstance(r04, (int, float))
+        ):
             self._hpstate["r03"] = r03 + r04 / 10
 
         self._hpstate["mqtt_counter"] += 1
@@ -124,9 +135,7 @@ class HeatPump:
         self._last_message_time = self._hass.loop.time()
         self._was_available = True
 
-        self._hass.bus.fire(
-            self._domain + "_" + self._id + "_msg_rec_event", {}
-        )
+        self._hass.bus.fire(self._domain + "_" + self._id + "_msg_rec_event", {})
 
     def __init__(self, hass, entry: ConfigEntry):
         self._hass = hass
@@ -212,10 +221,6 @@ class HeatPump:
 
         if self._hexFormat == True:
             _LOGGER.debug("INFO: Using HEX format")
-
-
-
-
 
     async def async_reset(self):
         """Reset this heatpump: unsubscribe from MQTT.
@@ -304,7 +309,5 @@ class HeatPump:
         _LOGGER.debug("topic:[%s]", topic)
         _LOGGER.debug("payload:[%s]", payload)
         self._hass.async_create_task(
-            mqtt.async_publish(
-                self._hass, topic, payload, qos=2, retain=False
-            )
+            mqtt.async_publish(self._hass, topic, payload, qos=2, retain=False)
         )

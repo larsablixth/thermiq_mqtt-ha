@@ -1,18 +1,23 @@
 """Component for ThermIQ-MQTT support."""
+
 import logging
 from datetime import datetime
 from sqlalchemy import update, select
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, Event
-from homeassistant.const import (
-    EVENT_HOMEASSISTANT_STARTED,
-    UnitOfTemperature
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, UnitOfTemperature
+from homeassistant.helpers.recorder import (
+    session_scope,
+    get_instance as recorder_get_instance,
 )
-from homeassistant.helpers.recorder import session_scope, get_instance as recorder_get_instance
 from homeassistant.components.recorder.statistics import async_change_statistics_unit
 from homeassistant.helpers import entity_registry as er
-from homeassistant.components.recorder.db_schema import StatisticsMeta, Statistics, StatisticsShortTerm
+from homeassistant.components.recorder.db_schema import (
+    StatisticsMeta,
+    Statistics,
+    StatisticsShortTerm,
+)
 
 from .const import (
     DOMAIN,
@@ -42,6 +47,7 @@ PLATFORMS = [
     "switch",
 ]
 
+
 async def async_setup(hass, config):
     """Set up HASL integration"""
     _LOGGER.info("Setup ThermIQ-MQTT integration")
@@ -50,15 +56,17 @@ async def async_setup(hass, config):
         worker = hass.data.setdefault(DOMAIN, ThermIQWorker(hass))
     return True
 
+
 # This call is for the ThermIQ global entry migration, not per-heatpump migration
 async def async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
     _LOGGER.info("Migrate ThermIQ-MQTT integration")
     return True
 
 
-async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_entry) -> bool:
-    """Migrate sensor state classes with safety checks and logging.
-    """
+async def async_migrate_state_temperature_celsius(
+    hass: HomeAssistant, config_entry
+) -> bool:
+    """Migrate sensor state classes with safety checks and logging."""
 
     # Check if migration has already been run
     current_version = config_entry.data.get(CONF_DB_VERSION, 0)
@@ -66,7 +74,11 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
         _LOGGER.info("Migration already completed (version %s)", current_version)
         return True
 
-    _LOGGER.info("Starting state class migration for ThermIQ-MQTT  temperature sensors from %s to %s)", current_version, DATABASE_VERSION)
+    _LOGGER.info(
+        "Starting state class migration for ThermIQ-MQTT  temperature sensors from %s to %s)",
+        current_version,
+        DATABASE_VERSION,
+    )
 
     # Verify recorder is available
     recorder = recorder_get_instance(hass)
@@ -92,12 +104,12 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
             if reg_id[key][1] in [
                 "temperature",
                 "temperature_input",
-                "generated_input"
+                "generated_input",
             ]:
-                unit=reg_id[key][2]
-                if len(unit)>0 and unit[-1:] == 'C':
+                unit = reg_id[key][2]
+                if len(unit) > 0 and unit[-1:] == "C":
                     # Decimal temperature cannot be converted automatically
-                    if not (unit[:1] == '0'):
+                    if not (unit[:1] == "0"):
                         entities.append(key)
 
         # List of time/runtime sensors that needs migration
@@ -108,15 +120,17 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
 
         for key in entities:
             try:
-                entity_id= f"{entity_id_prefix}{key}"
-                unit=reg_id[key][2]
-                decimal=False
-                if len(unit)>0:
-                    decimal=unit[:1] == '0'
+                entity_id = f"{entity_id_prefix}{key}"
+                unit = reg_id[key][2]
+                decimal = False
+                if len(unit) > 0:
+                    decimal = unit[:1] == "0"
                 entity_entry = entity_reg.async_get(entity_id)
 
                 if entity_entry is None:
-                    _LOGGER.debug("Entity %s not found in registry, skipping", entity_id)
+                    _LOGGER.debug(
+                        "Entity %s not found in registry, skipping", entity_id
+                    )
                     continue
 
                 _LOGGER.info("Migrating entity %s to temperature celsius", entity_id)
@@ -132,7 +146,9 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
                     _LOGGER.warning("Failed to migrate %s", entity_id)
 
             except Exception as e:
-                _LOGGER.error("Error migrating %s: %s", entity_id, str(e), exc_info=True)
+                _LOGGER.error(
+                    "Error migrating %s: %s", entity_id, str(e), exc_info=True
+                )
                 failed_entities.append(entity_id)
 
         # Log summary
@@ -140,7 +156,7 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
             "Migration summary: %s succeeded, %s failed, %s total",
             len(migrated_entities),
             len(failed_entities),
-            len(entities)
+            len(entities),
         )
 
         if migrated_entities:
@@ -154,10 +170,15 @@ async def async_migrate_state_temperature_celsius(hass: HomeAssistant, config_en
         return len(failed_entities) == 0 or len(migrated_entities) > 0
 
     except Exception as e:
-        _LOGGER.error("Critical error during state class migration: %s", str(e), exc_info=True)
+        _LOGGER.error(
+            "Critical error during state class migration: %s", str(e), exc_info=True
+        )
         return False
 
-async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decimal) -> bool:
+
+async def _migrate_celsius(
+    hass: HomeAssistant, recorder, entity_id: str, decimal
+) -> bool:
     """
     Migrate statistics metadata for a single entity.
 
@@ -186,17 +207,17 @@ async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decima
 
             unit = existing.unit_of_measurement
             if unit is None:
-                unit = ''
+                unit = ""
             if not decimal and unit != UnitOfTemperature.CELSIUS:
                 update_unit = (
                     update(StatisticsMeta)
                     .where(StatisticsMeta.statistic_id == entity_id)
-                    .values(
-                        unit_of_measurement=UnitOfTemperature.CELSIUS
-                    )
+                    .values(unit_of_measurement=UnitOfTemperature.CELSIUS)
                 )
                 stats_result = session.execute(update_unit)
-                _LOGGER.debug("Updated %s rows in StatisticsMeta", stats_result.rowcount)
+                _LOGGER.debug(
+                    "Updated %s rows in StatisticsMeta", stats_result.rowcount
+                )
             return (True, unit)
 
     try:
@@ -206,7 +227,7 @@ async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decima
             return True
 
         if decimal:
-            decimal_unit = '0.1' + UnitOfTemperature.CELSIUS
+            decimal_unit = "0.1" + UnitOfTemperature.CELSIUS
             if unit != decimal_unit:
                 # Called from the event loop as required
                 async_change_statistics_unit(
@@ -219,13 +240,14 @@ async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decima
                 _LOGGER.debug("No unit change needed for %s", entity_id)
         return True
     except Exception as e:
-        _LOGGER.error("Could not update celsius for %s: %s", entity_id, str(e), exc_info=True)
+        _LOGGER.error(
+            "Could not update celsius for %s: %s", entity_id, str(e), exc_info=True
+        )
         return False
 
 
 async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) -> bool:
-    """Migrate sensor state classes with safety checks and logging.
-    """
+    """Migrate sensor state classes with safety checks and logging."""
 
     # Check if migration has already been run
     current_version = config_entry.data.get(CONF_DB_VERSION, 0)
@@ -233,7 +255,11 @@ async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) 
         _LOGGER.info("Migration already completed (version %s)", current_version)
         return True
 
-    _LOGGER.info("Starting state class migration for ThermIQ sensors from %s to %s)", current_version, DATABASE_VERSION)
+    _LOGGER.info(
+        "Starting state class migration for ThermIQ sensors from %s to %s)",
+        current_version,
+        DATABASE_VERSION,
+    )
 
     # Verify recorder is available
     recorder = recorder_get_instance(hass)
@@ -273,7 +299,9 @@ async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) 
                 entity_entry = entity_reg.async_get(entity_id)
 
                 if entity_entry is None:
-                    _LOGGER.debug("Entity %s not found in registry, skipping", entity_id)
+                    _LOGGER.debug(
+                        "Entity %s not found in registry, skipping", entity_id
+                    )
                     continue
 
                 _LOGGER.info("Migrating entity %s to TOTAL_INCREASING", entity_id)
@@ -289,7 +317,9 @@ async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) 
                     _LOGGER.warning("Failed to migrate %s", entity_id)
 
             except Exception as e:
-                _LOGGER.error("Error migrating %s: %s", entity_id, str(e), exc_info=True)
+                _LOGGER.error(
+                    "Error migrating %s: %s", entity_id, str(e), exc_info=True
+                )
                 failed_entities.append(entity_id)
 
         # Log summary
@@ -297,7 +327,7 @@ async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) 
             "Migration summary: %s succeeded, %s failed, %s total",
             len(migrated_entities),
             len(failed_entities),
-            len(time_sensor_suffixes)
+            len(time_sensor_suffixes),
         )
 
         if migrated_entities:
@@ -311,11 +341,15 @@ async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) 
         return len(failed_entities) == 0 or len(migrated_entities) > 0
 
     except Exception as e:
-        _LOGGER.error("Critical error during state class migration: %s", str(e), exc_info=True)
+        _LOGGER.error(
+            "Critical error during state class migration: %s", str(e), exc_info=True
+        )
         return False
 
 
-async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id: str) -> bool:
+async def _migrate_statistics_metadata(
+    hass: HomeAssistant, recorder, entity_id: str
+) -> bool:
     """
     Migrate statistics for a single entity from MEASUREMENT to TOTAL_INCREASING.
     This preserves historical data by:
@@ -341,7 +375,9 @@ async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id:
                 existing = result.scalar_one_or_none()
 
                 if existing is None:
-                    _LOGGER.debug("No statistics metadata found for %s (new sensor)", entity_id)
+                    _LOGGER.debug(
+                        "No statistics metadata found for %s (new sensor)", entity_id
+                    )
                     return True  # Not an error - sensor might be new
 
                 # Check if already migrated
@@ -354,7 +390,7 @@ async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id:
                     "Migrating statistics for %s from MEASUREMENT to TOTAL_INCREASING (has_mean=%s, has_sum=%s)",
                     entity_id,
                     existing.has_mean,
-                    existing.has_sum
+                    existing.has_sum,
                 )
 
                 metadata_id = existing.id
@@ -363,7 +399,10 @@ async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id:
                 # For runtime sensors (hours), the mean value IS the cumulative runtime at that point
                 # We convert: mean -> sum, clear mean/min/max, and update mean_type to 0
 
-                _LOGGER.info("Converting statistics data for %s from mean to cumulative sum", entity_id)
+                _LOGGER.info(
+                    "Converting statistics data for %s from mean to cumulative sum",
+                    entity_id,
+                )
 
                 # Update Statistics table: convert mean to sum and state, clear mean/min/max
                 # For TOTAL_INCREASING, both sum and state should be the cumulative value
@@ -371,11 +410,11 @@ async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id:
                     update(Statistics)
                     .where(Statistics.metadata_id == metadata_id)
                     .values(
-                        sum=Statistics.mean,    # The mean value is actually the cumulative hours
+                        sum=Statistics.mean,  # The mean value is actually the cumulative hours
                         state=Statistics.mean,  # State is also the cumulative value at that time
                         mean=None,
                         min=None,
-                        max=None
+                        max=None,
                     )
                 )
                 stats_result = session.execute(update_stats)
@@ -386,15 +425,17 @@ async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id:
                     update(StatisticsShortTerm)
                     .where(StatisticsShortTerm.metadata_id == metadata_id)
                     .values(
-                        sum=StatisticsShortTerm.mean,    # The mean value is actually the cumulative hours
+                        sum=StatisticsShortTerm.mean,  # The mean value is actually the cumulative hours
                         state=StatisticsShortTerm.mean,  # State is also the cumulative value at that time
                         mean=None,
                         min=None,
-                        max=None
+                        max=None,
                     )
                 )
                 short_term_result = session.execute(update_short_term)
-                _LOGGER.debug("Updated %s rows in StatisticsShortTerm", short_term_result.rowcount)
+                _LOGGER.debug(
+                    "Updated %s rows in StatisticsShortTerm", short_term_result.rowcount
+                )
 
                 # Update metadata to TOTAL_INCREASING characteristics
                 # has_sum=True, has_mean=False, mean_type=0 (No mean)
@@ -411,23 +452,26 @@ async def _migrate_statistics_metadata(hass: HomeAssistant, recorder, entity_id:
                     _LOGGER.info(
                         "Successfully migrated %s: metadata updated, %s statistics records converted",
                         entity_id,
-                        stats_result.rowcount + short_term_result.rowcount
+                        stats_result.rowcount + short_term_result.rowcount,
                     )
                     return True
                 else:
-                    _LOGGER.warning("Failed to update statistics metadata for %s", entity_id)
+                    _LOGGER.warning(
+                        "Failed to update statistics metadata for %s", entity_id
+                    )
                     return False
 
         except Exception as e:
             _LOGGER.error("Error in database operation for %s: %s", entity_id, str(e))
             return False
 
-
     try:
         result = await recorder.async_add_executor_job(_migrate_statistics)
         return result
     except Exception as e:
-        _LOGGER.error("Could not migrate statistics for %s: %s", entity_id, str(e), exc_info=True)
+        _LOGGER.error(
+            "Could not migrate statistics for %s: %s", entity_id, str(e), exc_info=True
+        )
         return False
 
 
@@ -441,29 +485,38 @@ async def _async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
         bool: True if migration succeeded or was not needed, False if critical failure
     """
 
-
     current_version = config_entry.data.get(CONF_DB_VERSION, 0)
-    _LOGGER.info("Checking for possible migrations for ThermIQ [%s] data. Current installed version: %s, Update %s", config_entry.data[CONF_ID], current_version, DATABASE_VERSION)
+    _LOGGER.info(
+        "Checking for possible migrations for ThermIQ [%s] data. Current installed version: %s, Update %s",
+        config_entry.data[CONF_ID],
+        current_version,
+        DATABASE_VERSION,
+    )
     # Check if migration has already been run
     if current_version >= DATABASE_VERSION:
-        if (config_entry.data.get(CONF_MIGRATE_DATA, True)):
-            _LOGGER.info("Data migration requested for ThermIQ-MQTT [%s]", config_entry.data.get(CONF_ID, "unknown"))
+        if config_entry.data.get(CONF_MIGRATE_DATA, True):
+            _LOGGER.info(
+                "Data migration requested for ThermIQ-MQTT [%s]",
+                config_entry.data.get(CONF_ID, "unknown"),
+            )
         else:
             _LOGGER.info("Migration already completed (version %s)", current_version)
             return True
 
     # Mark migration request as disabled to avoid endless loops
     migration_data = {
-            **config_entry.data,
-            CONF_MIGRATE_DATA: False,
-            "migration_date": datetime.now().isoformat(),
-        }
+        **config_entry.data,
+        CONF_MIGRATE_DATA: False,
+        "migration_date": datetime.now().isoformat(),
+    }
     hass.config_entries.async_update_entry(config_entry, data=migration_data)
 
     try:
         success1 = await async_migrate_state_temperature_celsius(hass, config_entry)
         if not success1:
-            _LOGGER.error("Migration to temperature celsius - some entities may not function correctly")
+            _LOGGER.error(
+                "Migration to temperature celsius - some entities may not function correctly"
+            )
             # You can choose to return False here to prevent setup
             # or return True to continue with warnings
             # return True  # Continue anyway - partial failure is acceptable
@@ -474,13 +527,14 @@ async def _async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
         success2 = await async_migrate_state_class_inc_hour(hass, config_entry)
 
         if not success2:
-            _LOGGER.error("Migration to increasing hours failed - some entities may not function correctly")
+            _LOGGER.error(
+                "Migration to increasing hours failed - some entities may not function correctly"
+            )
             # You can choose to return False here to prevent setup
             # or return True to continue with warnings
             # return True  # Continue anyway - partial failure is acceptable
         else:
             _LOGGER.info("State class migrations completed successfully")
-
 
         if success1 and success2:
             # Mark migration as complete even if some entities failed
@@ -498,8 +552,6 @@ async def _async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
     except Exception as e:
         _LOGGER.error("Unexpected error during migration: %s", str(e), exc_info=True)
         return True  # Continue setup even if migration fails
-
-
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
