@@ -86,6 +86,8 @@ async def update_input_select(heatpump) -> None:
             )
 
     await platform.async_add_entities(to_add)
+    # Track for removal on config entry unload
+    heatpump._helper_entities.extend(to_add)
 
 
 def create_input_select_entity(heatpump, name) -> CustomInputSelect:
