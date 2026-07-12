@@ -212,18 +212,18 @@ class HeatPumpSensor(SensorEntity):
         return False
 
     @property
-    def state(self):
-        """Return the state of the sensor."""
+    def native_value(self):
+        """Return the native value of the sensor."""
         return self._state
 
     @property
     def vp_reg(self):
-        """Return the device class of the sensor."""
+        """Return the register of the sensor."""
         return self._vp_reg
 
     @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement."""
+    def native_unit_of_measurement(self):
+        """Return the native unit of measurement."""
         return self._unit
 
     @property
@@ -248,5 +248,5 @@ class HeatPumpSensor(SensorEntity):
             _LOGGER.debug("Could not get data for %s", self._idx)
         if self._state != state:
             self._state = state
-            self.async_schedule_update_ha_state()
+            self.async_write_ha_state()
             _LOGGER.debug("async_update_ha: %s", str(state))
