@@ -57,7 +57,6 @@ async def async_setup_entry(
     for key in reg_id:
         if reg_id[key][1] in [
             "binary_sensor",
-            "generated_input_boolean"
         ]:
             device_id = key
             if key in id_names:
@@ -191,5 +190,5 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         if self._state != bool_state:
             self._state = bool_state
             self._attr_is_on = bool(bool_state)
-            self.async_schedule_update_ha_state()
+            self.async_write_ha_state()
             _LOGGER.debug("async_update_ha: %s: [%s]",self._idx, str(bool_state))
