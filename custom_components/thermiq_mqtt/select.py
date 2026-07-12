@@ -54,6 +54,8 @@ class ThermIQSelect(SelectEntity):
     """A ThermIQ mode register exposed as a Select."""
 
     _attr_should_poll = False
+    # Use the entity name as-is; never prefix it with the device name
+    _attr_has_entity_name = False
 
     def __init__(self, heatpump: HeatPump, key: str) -> None:
         self._heatpump = heatpump
@@ -75,7 +77,7 @@ class ThermIQSelect(SelectEntity):
 
         self._attr_device_info = {
             ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: "Heatpump status",
+            ATTR_NAME: f"ThermIQ {heatpump._id}",
             ATTR_MANUFACTURER: MANUFACTURER,
             ATTR_MODEL: DEVVERSION,
             "entry_type": DeviceEntryType.SERVICE,

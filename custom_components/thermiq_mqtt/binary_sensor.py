@@ -92,6 +92,9 @@ async def async_setup_entry(
 class HeatPumpBinarySensor(BinarySensorEntity):
     """Common functionality for all entities."""
 
+    # Use the entity name as-is; never prefix it with the device name
+    _attr_has_entity_name = False
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -132,7 +135,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         # This is needed
         self._attr_device_info = {
             ATTR_IDENTIFIERS: {(DOMAIN, heatpump._id)},
-            ATTR_NAME: "Heatpump status",
+            ATTR_NAME: f"ThermIQ {heatpump._id}",
             ATTR_MANUFACTURER: MANUFACTURER,
             ATTR_MODEL: DEVVERSION,
             "entry_type": DeviceEntryType.SERVICE,
