@@ -1,5 +1,6 @@
 """Config flow"""
 import logging
+import re
 import voluptuous as vol
 from awesomeversion import AwesomeVersion
 from homeassistant.exceptions import HomeAssistantError
@@ -86,7 +87,15 @@ class DomainConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             )
 
-            id_name = user_input[CONF_ID]
+            id_name = user_input[CONF_ID].strip()
+            # id_name is embedded verbatim in entity_ids (e.g.
+            # number.thermiq_mqtt_<id>_...), so it must be slug-safe
+            if not re.fullmatch(r"[a-z0-9_]+", id_name):
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=error_schema,
+                    errors={"base": "creation_id"},
+                )
             unique_id = f"{DOMAIN}_{id_name}"
             # AbortFlow must propagate so a duplicate ID aborts with
             # "already_configured" instead of a misleading form error
