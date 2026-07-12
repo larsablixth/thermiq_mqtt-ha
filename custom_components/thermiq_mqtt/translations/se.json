@@ -1,47 +1,44 @@
 {
   "config": {
-    "flow_title": "Flow title",
+    "flow_title": "ThermIQ MQTT",
     "abort": {
-      "already_configured": "The entered id name is already in use."
+      "already_configured": "Det angivna ID-namnet används redan."
     },
     "error": {
-      "invalid_nodename": "The entered MQTT Nodename is not valid",
-      "creation_id": "The Unique ID is not Unique or not valid",
-      "creation_error": "An error occured while updating configuration object",
-      "invalid_language": "An error occured while creating configuration object"
+      "invalid_nodename": "Det angivna MQTT-nodnamnet är ogiltigt",
+      "creation_id": "Det unika ID:t är inte unikt eller ogiltigt",
+      "creation_error": "Ett fel uppstod när konfigurationsobjektet uppdaterades",
+      "invalid_language": "Ett fel uppstod när konfigurationsobjektet skapades"
     },
     "step": {
       "user": {
         "data": {
-          "id_name": "Unique ID",
-          "mqtt_node": "MQTT Nodename",
-          "language": "Language",
-          "hexformat": "Use hexformat for registers i MQTT",
-          "thermiq_dbg": "Enable debug",
-          "migrate_data": "Request migration of old data in recorder database (may take time)"
+          "id_name": "Unikt ID",
+          "mqtt_node": "MQTT-nodnamn",
+          "language": "Språk",
+          "hexformat": "Använd hexformat för register i MQTT",
+          "thermiq_dbg": "Aktivera MQTT-felsökning (skrivningar styrs om till dbg-topic)",
+          "migrate_data": "Begär migrering av gammal data i recorder-databasen (kan ta tid)"
         },
-        "title": "Heatpump config",
-        "description": "Set up a new ThermIQ_MQTT Instance"
+        "title": "Värmepumpskonfiguration",
+        "description": "Konfigurera en ny ThermIQ_MQTT-instans"
       }
-    },
-    "progress": {
-      "slow_task": "This message will be displayed if `slow_task` is returned as `progress_action` for `async_show_progress`."
     }
   },
   "options": {
     "abort": {
-      "already_configured": "The entered id name is already in use."
+      "already_configured": "Det angivna ID-namnet används redan."
     },
     "step": {
       "user": {
         "data": {
-          "mqtt_node": "MQTT Nodename",
-          "language": "Language",
-          "hexformat": "Use hexformat for registers i MQTT",
-          "thermiq_dbg": "Enable debug",
-          "migrate_data": "Request migration of old data in recorder database (may take time)"
+          "mqtt_node": "MQTT-nodnamn",
+          "language": "Språk",
+          "hexformat": "Använd hexformat för register i MQTT",
+          "thermiq_dbg": "Aktivera MQTT-felsökning (skrivningar styrs om till dbg-topic)",
+          "migrate_data": "Begär migrering av gammal data i recorder-databasen (kan ta tid)"
         },
-        "title": "Options"
+        "title": "Alternativ"
       }
     }
   }
