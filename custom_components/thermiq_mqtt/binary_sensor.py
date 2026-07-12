@@ -190,8 +190,8 @@ class HeatPumpBinarySensor(BinarySensorEntity):
                 _LOGGER.debug("Non-numeric data for %s: [%s]", self._idx, reg_state)
                 bool_state = None
 
-        if self._state != bool_state:
-            self._state = bool_state
-            self._attr_is_on = bool(bool_state)
-            self.async_write_ha_state()
-            _LOGGER.debug("async_update_ha: %s: [%s]", self._idx, str(bool_state))
+        self._state = bool_state
+        self._attr_is_on = bool(bool_state)
+        # Always write, even when the value is unchanged: availability
+        # transitions must reach the state machine too
+        self.async_write_ha_state()

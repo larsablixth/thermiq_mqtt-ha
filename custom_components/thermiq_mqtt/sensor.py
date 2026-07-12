@@ -275,7 +275,8 @@ class HeatPumpSensor(SensorEntity):
         state = self._hpstate.get(self._vp_reg)
         if state is None:
             _LOGGER.debug("Could not get data for %s", self._idx)
-        if self._state != state:
-            self._state = state
-            self.async_write_ha_state()
-            _LOGGER.debug("async_update_ha: %s", str(state))
+        self._state = state
+        # Always write, even when the value is unchanged: availability
+        # transitions must reach the state machine too, otherwise an entity
+        # whose register never updates stays stuck at 'unavailable'
+        self.async_write_ha_state()
