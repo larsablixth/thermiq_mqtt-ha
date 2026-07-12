@@ -145,6 +145,30 @@ async def test_send_mqtt_reg_accepts_boolean_for_switch_register():
         assert json.loads(payload) == {"EVU": 1}
 
 
+async def test_send_mqtt_reg_accepts_negative_value_in_range():
+    hp, hass = _make_writable_heatpump()
+    with patch(
+        "custom_components.thermiq_mqtt.heatpump.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as publish:
+        # integral1_curve_p5 (r37) allows -5..5; the wire format is 16-bit
+        # two's complement, so -3 must be published as 65533
+        await hp.send_mqtt_reg("integral1_curve_p5", -3, 0xFFFF)
+        publish.assert_called_once()
+        payload = json.loads(publish.call_args[0][2])
+        assert payload == {"d055": 65533}
+
+
+async def test_send_mqtt_reg_rejects_negative_value_below_min():
+    hp, hass = _make_writable_heatpump()
+    with patch(
+        "custom_components.thermiq_mqtt.heatpump.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as publish:
+        await hp.send_mqtt_reg("integral1_curve_p5", -6, 0xFFFF)
+        publish.assert_not_called()
+
+
 async def test_send_mqtt_reg_rejects_non_numeric_value():
     hp, hass = _make_writable_heatpump()
     with patch(

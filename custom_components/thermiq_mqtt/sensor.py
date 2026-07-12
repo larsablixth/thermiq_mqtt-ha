@@ -126,10 +126,10 @@ class HeatPumpSensor(SensorEntity):
         self.entity_id = f"sensor.{heatpump._domain}_{heatpump._id}_{device_id}"
         self._attr_unique_id = "uid-" + self.entity_id
 
-        _LOGGER.debug("entity_id:" + self.entity_id)
-        _LOGGER.debug("idx:" + device_id)
+        _LOGGER.debug("entity_id: %s idx: %s", self.entity_id, device_id)
         self._name = friendly_name
         self._state = None
+        self._last_available: bool | None = None
         self._icon = "mdi:gauge"
         # Default: no state class. Only numeric sensors get MEASUREMENT /
         # TOTAL_INCREASING - string sensors (time, communication_status,
@@ -206,9 +206,6 @@ class HeatPumpSensor(SensorEntity):
             self._unit = ""
             self._icon = "mdi:alert"
         # "mdi:thermometer" ,"mdi:oil-temperature", "mdi:gauge", "mdi:speedometer", "mdi:alert"
-        self._entity_picture = None
-        self._available = True
-
         self._idx = device_id
         self._vp_reg = vp_reg
 
@@ -263,7 +260,7 @@ class HeatPumpSensor(SensorEntity):
     async def async_update(self) -> None:
         """Update the value of the entity."""
 
-        _LOGGER.debug("update: " + self._idx)
+        _LOGGER.debug("update: %s", self._idx)
         self._state = self._hpstate.get(self._vp_reg)
         if self._state is None:
             _LOGGER.warning("Could not get data for %s", self._idx)
@@ -271,12 +268,16 @@ class HeatPumpSensor(SensorEntity):
     async def _async_update_event(self, event: Event) -> None:
         """Update the new state of the sensor."""
 
-        _LOGGER.debug("event: " + self._idx)
+        _LOGGER.debug("event: %s", self._idx)
         state = self._hpstate.get(self._vp_reg)
         if state is None:
             _LOGGER.debug("Could not get data for %s", self._idx)
-        self._state = state
-        # Always write, even when the value is unchanged: availability
-        # transitions must reach the state machine too, otherwise an entity
-        # whose register never updates stays stuck at 'unavailable'
-        self.async_write_ha_state()
+        # Write on value change OR availability transition: an entity whose
+        # register never updates must still reflect available/unavailable,
+        # otherwise it stays stuck at 'unavailable' after boot
+        available = self._heatpump.available
+        if self._state != state or self._last_available != available:
+            self._state = state
+            self._last_available = available
+            self.async_write_ha_state()
+            _LOGGER.debug("async_update_ha: %s", str(state))

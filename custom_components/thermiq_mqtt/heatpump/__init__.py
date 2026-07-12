@@ -299,19 +299,12 @@ class HeatPump:
         register = reg_id[register_id][0]
         _LOGGER.debug("register:[%s]", register)
 
-        if not (isinstance(value, int) or isinstance(value, float)) or value is None:
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
             _LOGGER.error("No MQTT message sent due to missing value:[%s]", value)
             return
 
         if bitmask is None:
             bitmask = 0xFFFF
-
-        ## check the bitmask
-        # value = value | bitmask
-        if register_id == "room_sensor_set_t":
-            value = float(value)
-        else:
-            value = int(value) & int(bitmask)
 
         if not (register in self._id_reg):
             _LOGGER.error("No MQTT message sent due to unknown register:[%s]", register)
@@ -320,6 +313,10 @@ class HeatPump:
         # Defense in depth: never publish a value the register table does not
         # allow, regardless of what the caller (UI, automation, service call)
         # asked for. The pump itself does not range-check writes.
+        # Validation MUST run on the raw value BEFORE the bitmask conversion:
+        # negative values (heating curve +-5, brine_min_t, sensor offsets) are
+        # sent as 16-bit two's complement, which would land far outside the
+        # register bounds if checked after masking.
         regtype = reg_id[register_id][FIELD_REGTYPE]
         if regtype == "generated_input_boolean":
             if value not in (0, 1):
@@ -343,6 +340,13 @@ class HeatPump:
                     max_value,
                 )
                 return
+
+        ## check the bitmask
+        # value = value | bitmask
+        if register_id == "room_sensor_set_t":
+            value = float(value)
+        else:
+            value = int(value) & int(bitmask)
 
         # Lets use the decimal register notation in the MQTT message towards ThermIQ-MQTT to improve human readability
 

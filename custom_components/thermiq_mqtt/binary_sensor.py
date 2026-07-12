@@ -20,11 +20,8 @@ from .const import (
 from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_BITMASK,
-    FIELD_MAXVALUE,
-    FIELD_MINVALUE,
     FIELD_REGNUM,
     FIELD_REGTYPE,
-    FIELD_UNIT,
     id_names,
     reg_id,
 )
@@ -104,15 +101,12 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         self.entity_id = f"binary_sensor.{heatpump._domain}_{heatpump._id}_{device_id}"
         self._attr_unique_id = "uid-" + self.entity_id
 
-        _LOGGER.debug("entity_id:" + self.entity_id)
-        _LOGGER.debug("idx:" + device_id)
+        _LOGGER.debug("entity_id: %s idx: %s", self.entity_id, device_id)
         self._name = friendly_name
         self._state: bool | None = None
-        self._attr_is_on = False
+        self._attr_is_on: bool | None = None
+        self._last_available: bool | None = None
         self._icon = "mdi:flash-outline"
-
-        self._entity_picture = None
-        self._available = True
 
         self._idx = device_id
         self._vp_reg = vp_reg
@@ -165,7 +159,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
     async def async_update(self) -> None:
         """Update the new state of the sensor."""
 
-        _LOGGER.debug("update: " + self._idx)
+        _LOGGER.debug("update: %s", self._idx)
         reg_state = self._hpstate.get(self._vp_reg)
         if reg_state is None:
             _LOGGER.warning("Could not get data for %s", self._idx)
@@ -176,7 +170,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
     async def _async_update_event(self, event: Event) -> None:
         """Update the new state of the sensor."""
 
-        _LOGGER.debug("event: " + self._idx)
+        _LOGGER.debug("event: %s", self._idx)
         if self._vp_reg == "evu":
             _LOGGER.debug("EVU reg state read special")
         reg_state = self._hpstate.get(self._vp_reg)
@@ -190,8 +184,13 @@ class HeatPumpBinarySensor(BinarySensorEntity):
                 _LOGGER.debug("Non-numeric data for %s: [%s]", self._idx, reg_state)
                 bool_state = None
 
-        self._state = bool_state
-        self._attr_is_on = bool(bool_state)
-        # Always write, even when the value is unchanged: availability
-        # transitions must reach the state machine too
-        self.async_write_ha_state()
+        # Write on value change OR availability transition: an entity whose
+        # register never updates must still reflect available/unavailable.
+        # None stays None so HA shows 'unknown' instead of a false 'off'.
+        available = self._heatpump.available
+        if self._state != bool_state or self._last_available != available:
+            self._state = bool_state
+            self._attr_is_on = bool_state
+            self._last_available = available
+            self.async_write_ha_state()
+            _LOGGER.debug("async_update_ha: %s: [%s]", self._idx, str(bool_state))
