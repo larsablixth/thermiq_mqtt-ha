@@ -1,29 +1,18 @@
 import logging
-from numbers import Number
-from typing import TYPE_CHECKING, Literal, final
 from homeassistant.core import HomeAssistant, callback
 
-from homeassistant.const import STATE_OFF, STATE_ON
-
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
-    BinarySensorEntityDescription,
 )
 from homeassistant.const import (
     ATTR_IDENTIFIERS,
     ATTR_MANUFACTURER,
     ATTR_MODEL,
     ATTR_NAME,
-    STATE_OFF,
-    STATE_ON,
-    EntityCategory)
+)
 
 from homeassistant.helpers.device_registry import DeviceEntryType
 
-from homeassistant.const import (
-    PERCENTAGE
-)
 from .const import (
     DOMAIN,
     MANUFACTURER,
@@ -42,9 +31,6 @@ from .heatpump.thermiq_regs import (
     id_names,
     reg_id,
 )
-
-
-from functools import cached_property
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,17 +107,11 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         self._idx = device_id
         self._vp_reg = vp_reg
         self._bitmask = bitmask
-        # ???
-        if isinstance(vp_reg,Number):
-            self._sorter = int("0x" + vp_reg[1:], 0) * 65536 + int(bitmask)
-        else:
-            self._sorter = 256 * 65536 + int(bitmask)
-
-        # Listen for the ThermIQ rec event indicating new data
-        hass.bus.async_listen(
-            heatpump._domain + "_" + heatpump._id + "_msg_rec_event",
-            self._async_update_event,
-        )
+        # Sort key: register number (hex string like 'r10') then bitmask
+        try:
+            self._sorter = int(vp_reg[1:], 16) * 65536 + int(bitmask)
+        except (TypeError, ValueError):
+            self._sorter = 256 * 65536
 
         # This is needed
         self._attr_device_info = {
@@ -143,6 +123,18 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         }
 
 
+    async def async_added_to_hass(self):
+        """Register the update listener; removed automatically on unload."""
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                self._heatpump._domain
+                + "_"
+                + self._heatpump._id
+                + "_msg_rec_event",
+                self._async_update_event,
+            )
+        )
+
     @property
     def name(self):
         """Return the name of the sensor."""
@@ -153,24 +145,14 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         """No need to poll. Coordinator notifies entity of updates."""
         return False
 
-    @final
-    @property
-    def state(self) -> Literal["on", "off"]:
-        """Return the state of the sensor."""
-        return STATE_ON if (self._state) else STATE_OFF
-
     @property
     def vp_reg(self):
-        """Return the device class of the sensor."""
+        """Return the register of the sensor."""
         return self._vp_reg
-
-    @cached_property
-    def is_on(self) -> bool:
-        return (self._state==True)
 
     @property
     def sorter(self):
-        """Return the state of the sensor."""
+        """Return the sort key of the sensor."""
         return self._sorter
 
     @property
@@ -179,12 +161,11 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         return self._icon
 
     async def async_update(self):
-        """Update the value of the entity."""
         """Update the new state of the sensor."""
 
         _LOGGER.debug("update: " + self._idx)
-        reg_state = self._hpstate[self._vp_reg]
-        if self._state is None:
+        reg_state = self._hpstate.get(self._vp_reg)
+        if reg_state is None:
             _LOGGER.warning("Could not get data for %s", self._idx)
         else:
             self._state = (int(reg_state) & self._bitmask) > 0
@@ -196,22 +177,19 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         _LOGGER.debug("event: " + self._idx)
         if self._vp_reg=='evu':
             _LOGGER.debug("EVU reg state read special")
-        reg_state = self._hpstate[self._vp_reg]
+        reg_state = self._hpstate.get(self._vp_reg)
         if reg_state is None:
             _LOGGER.debug("Could not get data for %s", self._idx)
-            self._state = None
             bool_state = None
-            self._attr_is_on = False
         else:
-            bool_state = (int(reg_state) & self._bitmask) > 0
+            try:
+                bool_state = (int(reg_state) & self._bitmask) > 0
+            except (TypeError, ValueError):
+                _LOGGER.debug("Non-numeric data for %s: [%s]", self._idx, reg_state)
+                bool_state = None
 
         if self._state != bool_state:
             self._state = bool_state
-            self._attr_is_on = self._state
+            self._attr_is_on = bool(bool_state)
             self.async_schedule_update_ha_state()
             _LOGGER.debug("async_update_ha: %s: [%s]",self._idx, str(bool_state))
-
-    @property
-    def device_class(self):
-        """Return the class of this device."""
-        return f"{DOMAIN}_HeatPumpSensor"
