@@ -282,9 +282,11 @@ id_names: dict[str, list[str]] = {
         "Vorlauftemperatur, Soll",
     ],
     "supplyline_shunt_target_t": [
-        # r0f is the pump's EFFECTIVE shunt/pool target: 0 while pool heating
-        # is off, tracks the r40 setpoint while active
-        "Pool temp target (effective)",
+        # r0f is another non-live register on this pump: constant 0 even
+        # while the pool circuit is demonstrably being heated (verified
+        # 2026-07-12 against compressor/DHW state and supply temps). The
+        # earlier nonzero readings were pre-v3.2.0 partial-message artifacts.
+        "Shunt supply target (unused)",
         "Framledn.temp., shunt, bör",
         "Haluttu menoveden lämpötila, shuntti",
         "Tur temp., shunt, bør",
