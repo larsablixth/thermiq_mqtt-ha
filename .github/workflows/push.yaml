@@ -32,4 +32,14 @@ jobs:
         - run: python3 -m pip install black
         - run: black --check .
 
-  
+  test:
+    runs-on: "ubuntu-latest"
+    name: Run tests
+    steps:
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
+          with:
+            python-version: "3.13"
+        - run: python3 -m pip install -r requirements_test.txt
+        - run: python3 -m pytest tests -v
+
