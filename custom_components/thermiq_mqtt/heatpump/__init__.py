@@ -3,7 +3,6 @@ import logging, json
 from collections.abc import Callable
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import callback
 
 from homeassistant.components.input_number import (
     ATTR_VALUE as INP_ATTR_VALUE,
@@ -62,107 +61,112 @@ class HeatPump:
     unsubscribe_callback: Callable[[], None]
 
     # ###
-    @callback
     async def message_received(self, message):
         """Handle new MQTT messages."""
         from ..input_boolean import (SERVICE_SET_VALUE as BOOLEAN_SERVICE_SET_VALUE,)
         _LOGGER.debug("%s: message.payload:[%s]", self._id, message.payload)
         try:
             json_dict = json.loads(message.payload)
-            if json_dict["Client_Name"][:8] == "ThermIQ_":
-                for k in json_dict.keys():
-                    kstore = k.lower()
-                    dstore = k
-                    # # Make INDR_T, EVU and timestamp appear as normal register
-                    # if kstore == "indr_t":
-                    #     kstore = "rf0"
-                    # if kstore == "timestamp":
-                    #     kstore = "rf1"
-                    if kstore == "evu":
-                        kstore = 'evu'
-                        dstore='d300'
-                    # # Create hex notation if incoming register is decimal format
-                    # Named registers must be longer than 4 characters to avoid confusion
-                    if k[0] == "d" and len(k) < 5:
-                        reg = int(k[1:])
-                        kstore = "r" + format(reg, "02x")
-                        dstore = "d" + format(reg, "03d")
-                        if len(kstore) != 3:
-                            kstore = k
-                    # Create decimal notation if incoming register is hex format
-                    if k[0] == "r" and len(k) == 3:
-                        reg = int(k[1:], 16)
-                        dstore = "d" + format(reg, "03d")
+        except ValueError:
+            _LOGGER.error("MQTT payload could not be parsed as JSON")
+            _LOGGER.debug("Erroneous JSON: %s", message.payload)
+            return
 
-                    _LOGGER.debug(
-                        "[%s] [%s] [%s] [%s]", self._id, kstore, json_dict[k], dstore
-                    )
+        if not isinstance(json_dict, dict) or str(json_dict.get("Client_Name", ""))[:8] != "ThermIQ_":
+            _LOGGER.error("JSON result was not from ThermIQ-mqtt")
+            return
 
-                    # Internal mapping of ThermIQ_MQTT regs, used to create update events
-                    self._hpstate[kstore] = json_dict[k]
-                    # hass.states.async_set(DOMAIN+"." +kstore, json_dict[k])
+        # Track which registers arrived in this message
+        received = set()
 
-                    # Map incomming registers to named settings based on id_reg (thermiq_regs)
-                    if kstore in self._id_reg:
-                        # r01 and r03 should be combined with respective decimal part r02 and r04
-                        # i.e thermiq_mqtt_vp1.outdoor_t
-                        if kstore != "r01" and kstore != "r03":
-                            # self._hass.states.async_set(
-                            #     self._domain
-                            #     + "_"
-                            #     + self._id
-                            #     + "."
-                            #     + self._id_reg[kstore],
-                            #     json_dict[k],
-                            # )
-                            ## Set the corresponding input_number/input_select if applicable, incomming message always rules over UI settings
-                            if reg_id[self._id_reg[kstore]][1] in [
-                                "temperature_input",
-                                "time_input",
-                                "sensor_input",
-                                "generated_input",
-                            ]:
-                                context = {
-                                    INP_ATTR_VALUE: json_dict[k],
-                                    ATTR_ENTITY_ID: "input_number."
-                                    + self._domain
-                                    + "_"
-                                    + self._id
-                                    + "_"
-                                    + self._id_reg[kstore],
-                                }
-                                self._hass.async_create_task(
-                                    self._hass.services.async_call(
-                                        NUMBER_DOMAIN,
-                                        NUMBER_SERVICE_SET_VALUE,
-                                        context,
-                                        blocking=False,
-                                    )
+        for k in json_dict.keys():
+            # A malformed key must not abort processing of the remaining keys
+            try:
+                kstore = k.lower()
+                dstore = k
+                if kstore == "evu":
+                    dstore = 'd300'
+                # # Create hex notation if incoming register is decimal format
+                # Named registers must be longer than 4 characters to avoid confusion
+                if k[0] == "d" and len(k) < 5:
+                    reg = int(k[1:])
+                    kstore = "r" + format(reg, "02x")
+                    dstore = "d" + format(reg, "03d")
+                    if len(kstore) != 3:
+                        kstore = k
+                # Create decimal notation if incoming register is hex format
+                if k[0] == "r" and len(k) == 3:
+                    reg = int(k[1:], 16)
+                    dstore = "d" + format(reg, "03d")
+
+                _LOGGER.debug(
+                    "[%s] [%s] [%s] [%s]", self._id, kstore, json_dict[k], dstore
+                )
+
+                # Internal mapping of ThermIQ_MQTT regs, used to create update events
+                self._hpstate[kstore] = json_dict[k]
+                received.add(kstore)
+
+                # Map incomming registers to named settings based on id_reg (thermiq_regs)
+                if kstore in self._id_reg:
+                    # r01 and r03 should be combined with respective decimal part r02 and r04
+                    # i.e thermiq_mqtt_vp1.outdoor_t
+                    if kstore != "r01" and kstore != "r03":
+                        ## Set the corresponding input_number/input_select if applicable, incomming message always rules over UI settings
+                        regtype = reg_id[self._id_reg[kstore]][1]
+                        if regtype in [
+                            "temperature_input",
+                            "time_input",
+                            "sensor_input",
+                            "generated_input",
+                        ]:
+                            context = {
+                                INP_ATTR_VALUE: json_dict[k],
+                                ATTR_ENTITY_ID: "input_number."
+                                + self._domain
+                                + "_"
+                                + self._id
+                                + "_"
+                                + self._id_reg[kstore],
+                            }
+                            self._hass.async_create_task(
+                                self._hass.services.async_call(
+                                    NUMBER_DOMAIN,
+                                    NUMBER_SERVICE_SET_VALUE,
+                                    context,
+                                    blocking=False,
                                 )
-                            if reg_id[self._id_reg[kstore]][1] in [
-                                "generated_input_boolean",
-                            ]:
-                                context = {
-                                    INP_ATTR_VALUE: json_dict[k],
-                                    ATTR_ENTITY_ID: "input_boolean."
-                                    + self._domain
-                                    + "_"
-                                    + self._id
-                                    + "_"
-                                    + self._id_reg[kstore],
-                                }
-                                self._hass.async_create_task(
-                                    self._hass.services.async_call(
-                                        BOOLEAN_DOMAIN,
-                                        BOOLEAN_SERVICE_SET_VALUE,
-                                        context,
-                                        blocking=False,
-                                    )
+                            )
+                        if regtype in [
+                            "generated_input_boolean",
+                        ]:
+                            context = {
+                                INP_ATTR_VALUE: json_dict[k],
+                                ATTR_ENTITY_ID: "input_boolean."
+                                + self._domain
+                                + "_"
+                                + self._id
+                                + "_"
+                                + self._id_reg[kstore],
+                            }
+                            self._hass.async_create_task(
+                                self._hass.services.async_call(
+                                    BOOLEAN_DOMAIN,
+                                    BOOLEAN_SERVICE_SET_VALUE,
+                                    context,
+                                    blocking=False,
                                 )
+                            )
 
-                            if reg_id[self._id_reg[kstore]][1] == "select_input":
-                                mode = f"mode{json_dict[k]}"
-
+                        if regtype == "select_input":
+                            mode = f"mode{json_dict[k]}"
+                            if mode not in id_names:
+                                _LOGGER.warning(
+                                    "Unknown mode value [%s] received for %s, ignoring",
+                                    json_dict[k],
+                                    self._id_reg[kstore],
+                                )
+                            else:
                                 context = {
                                     ATTR_OPTION: f"{json_dict[k]} - "
                                     + id_names[mode][self._langid],
@@ -181,67 +185,43 @@ class HeatPump:
                                         blocking=False,
                                     )
                                 )
-
-                # Do some post processing of data received
-                self._hpstate["r01"] = self._hpstate["r01"] + self._hpstate["r02"] / 10
-
-                # self._hass.states.async_set(
-                #     self._domain + "_" + self._id + "." + self._id_reg["r01"],
-                #     self._hpstate["r01"],
-                # )
-
-                self._hpstate["r03"] = self._hpstate["r03"] + self._hpstate["r04"] / 10
-                # self._hass.states.async_set(
-                #     self._domain + "_" + self._id + "." + self._id_reg["r03"],
-                #     self._hpstate["r03"],
-                # )
-
-                self._hpstate["mqtt_counter"] += 1
-
-                if "time" in json_dict:
-                    self._hpstate["time_str"] = json_dict["time"]
-                    # self._hass.states.async_set(
-                    #     self._domain + "_" + self._id + ".time_str", json_dict["time"]
-                    # )
-                elif "Time" in json_dict:
-                    self._hpstate["time_str"] = json_dict["Time"]
-                    # self._hass.states.async_set(
-                    #     self._domain + "_" + self._id + ".time_str", json_dict["Time"]
-                    # )
-
-                if "vp_read" in json_dict:
-                    self._hpstate["communication_status"] = json_dict["vp_read"]
-
-                    # self._hass.states.async_set(
-                    #     self._domain
-                    #     + "_"
-                    #     + self._id
-                    #     + ".heatpump_communication_status",
-                    #     json_dict["vp_read"],
-                    # )
-                else:
-                    self._hpstate["communication_status"] = "Ok"
-                    # self._hass.states.async_set(
-                    #     self._domain
-                    #     + "_"
-                    #     + self._id
-                    #     + ".heatpump_communication_status",
-                    #     "ok",
-                    # )
-
-                if "app_info" in json_dict:
-                    self._hpstate["app_info"] = json_dict["app_info"]
-
-
-                self._hass.bus.fire(
-                    self._domain + "_" + self._id + "_msg_rec_event", {}
+            except (ValueError, KeyError, IndexError, TypeError) as err:
+                _LOGGER.warning(
+                    "Could not process key [%s] in MQTT message: %s", k, err
                 )
 
-            else:
-                _LOGGER.error("JSON result was not from ThermIQ-mqtt")
-        except ValueError:
-            _LOGGER.error("MQTT payload could not be parsed as JSON")
-            _LOGGER.debug("Erroneous JSON: %s", message.payload)
+        # Do some post processing of data received
+        # r01/r03 are combined with their decimal parts r02/r04, but only when
+        # they arrived in this message - otherwise the decimal part would
+        # compound onto an already combined value
+        r01 = self._hpstate.get("r01")
+        r02 = self._hpstate.get("r02")
+        if "r01" in received and isinstance(r01, (int, float)) and isinstance(r02, (int, float)):
+            self._hpstate["r01"] = r01 + r02 / 10
+
+        r03 = self._hpstate.get("r03")
+        r04 = self._hpstate.get("r04")
+        if "r03" in received and isinstance(r03, (int, float)) and isinstance(r04, (int, float)):
+            self._hpstate["r03"] = r03 + r04 / 10
+
+        self._hpstate["mqtt_counter"] += 1
+
+        if "time" in json_dict:
+            self._hpstate["time_str"] = json_dict["time"]
+        elif "Time" in json_dict:
+            self._hpstate["time_str"] = json_dict["Time"]
+
+        if "vp_read" in json_dict:
+            self._hpstate["communication_status"] = json_dict["vp_read"]
+        else:
+            self._hpstate["communication_status"] = "Ok"
+
+        if "app_info" in json_dict:
+            self._hpstate["app_info"] = json_dict["app_info"]
+
+        self._hass.bus.fire(
+            self._domain + "_" + self._id + "_msg_rec_event", {}
+        )
 
     def __init__(self, hass, entry: ConfigEntry):
         self._hass = hass
@@ -251,13 +231,16 @@ class HeatPump:
         self._id = entry.data[CONF_ID]
         self._id_reg = {}
         self.unsubscribe_callback = None
-
+        # Generated input_number/input_select/input_boolean entities,
+        # tracked so they can be removed when the entry is unloaded
+        self._helper_entities = []
 
         # Create reverse lookup dictionary (id_reg->reg_number)
-
+        # Registers start as None (unknown) until the first MQTT message;
+        # -1 would make every bitmask test true and light up all alarms
         for k, v in reg_id.items():
             self._id_reg[v[0]] = k
-            self._hpstate[v[0]] = -1
+            self._hpstate[v[0]] = None
 
     async def setup_mqtt(self):
         self._hpstate["time_str"] = self._data_topic
@@ -276,18 +259,26 @@ class HeatPump:
         self._mqtt_base = entry.data[CONF_MQTT_NODE] + "/"
         self._hexFormat = entry.data[CONF_MQTT_HEX]
         self._data_topic = self._mqtt_base + "data"
-        self._cmd_topic = self._mqtt_base + "write"
-        self._set_topic = self._mqtt_base + "set"
+        if self._dbg is True:
+            # Debug mode diverts all writes to dbg_ topics so that a real
+            # heatpump is never affected. The topics must be derived AFTER
+            # applying the prefix, otherwise debug writes would still reach
+            # the real heatpump
+            self._cmd_topic = self._mqtt_base + "dbg_write"
+            self._set_topic = self._mqtt_base + "dbg_set"
+            _LOGGER.warning(
+                "MQTT Debug write enabled, writes are diverted to [%s]",
+                self._cmd_topic,
+            )
+        else:
+            self._cmd_topic = self._mqtt_base + "write"
+            self._set_topic = self._mqtt_base + "set"
         self._hpstate["mqtt_counter"] = 0
 
         # Provide some debug info
         _LOGGER.debug(
             f"INFO: {self._domain}_{self._id} mqtt_node: [{entry.data[CONF_MQTT_NODE]}]"
         )
-
-        if self._dbg is True:
-            self._mqtt_base = self._mqtt_base + "dbg_"
-            _LOGGER.error("INFO: MQTT Debug write enabled")
 
         _LOGGER.debug("Language[%s]", self._langid)
 
@@ -299,8 +290,16 @@ class HeatPump:
 
 
     async def async_reset(self):
-        """Reset this heatpump to default state."""
-        # unsubscribe here
+        """Reset this heatpump: unsubscribe MQTT and remove generated helpers."""
+        if self.unsubscribe_callback is not None:
+            self.unsubscribe_callback()
+            self.unsubscribe_callback = None
+        for entity in list(self._helper_entities):
+            try:
+                await entity.async_remove(force_remove=True)
+            except Exception as err:  # entity may already be gone
+                _LOGGER.debug("Could not remove entity: %s", err)
+        self._helper_entities = []
         return True
 
     @property
@@ -315,7 +314,7 @@ class HeatPump:
     def get_value(self, item):
         """Get value for sensor."""
         res = self._hpstate.get(item)
-        _LOGGER.debug("get_value(" + item + ")=%d", res)
+        _LOGGER.debug("get_value(%s)=%s", item, res)
         return res
 
     def update_state(self, command, state_command):
