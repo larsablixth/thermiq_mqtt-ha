@@ -20,7 +20,7 @@ From v3.x:
 # Steps to install ThermIQ HA Integration
 1. Install the Mosquitto Add-on in Home Assistant.
 2. Install [MQTT Explorer](https://mqtt-explorer.com/) on your PC and verify that you can connect to Mosquitto
-3. Configure your **ThermIQ** device according to the indstructions at [Thermiq.net](https://thermiq.net)
+3. Configure your **ThermIQ** device according to the instructions at [Thermiq.net](https://thermiq.net)
 1. Use MQTT-Explorer to verify that your **ThermIQ** device is sending information to Mosquitto. You should see MQTT messages in MQTT-Explorer from the heatpump every 30s
 2. Install the MQTT Integration in Home Assistant and verify that it's communicating with the Mosquitto Add-on.
 3. Install [HACS](https://github.com/custom-components/hacs)
@@ -46,7 +46,7 @@ From v3.x:
   
 ### Debugging
 
-Use [MQTT Explorer](https://mqtt-explorer.com/) to ensure your heat pump is communicating with the **Moqsuitto** before setting up HA.
+Use [MQTT Explorer](https://mqtt-explorer.com/) to ensure your heat pump is communicating with the **Mosquitto** before setting up HA.
 
 Home Assistant server sometimes needs to be restarted once all configuration is done
 
