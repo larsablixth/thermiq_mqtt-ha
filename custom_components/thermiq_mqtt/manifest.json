@@ -10,7 +10,11 @@
     "recorder"
   ],
   "documentation": "https://github.com/larsablixth/thermiq_mqtt-ha",
+  "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/larsablixth/thermiq_mqtt-ha/issues",
-  "version": "3.3.0"
+  "loggers": [
+    "custom_components.thermiq_mqtt"
+  ],
+  "version": "3.3.1"
 }
