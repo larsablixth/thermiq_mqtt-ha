@@ -282,7 +282,9 @@ id_names: dict[str, list[str]] = {
         "Vorlauftemperatur, Soll",
     ],
     "supplyline_shunt_target_t": [
-        "Supplyline target temp., shunt",
+        # r0f is the pump's EFFECTIVE shunt/pool target: 0 while pool heating
+        # is off, tracks the r40 setpoint while active
+        "Pool temp target (effective)",
         "Framledn.temp., shunt, bör",
         "Haluttu menoveden lämpötila, shuntti",
         "Tur temp., shunt, bør",
