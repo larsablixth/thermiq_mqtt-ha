@@ -245,7 +245,9 @@ id_names: dict[str, list[str]] = {
         "Kühlung Temperatur",
     ],
     "supply_shunt_t": [
-        "Supplyline temp., shunt",
+        # r0b is the shunt-circuit supply sensor - in this installation the
+        # boiler-room sensor the pump regulates the pool circuit against
+        "Pool temp actual",
         "Framledn.temp., shunt",
         "Menovesi lämpötila, shuntti",
         "Tur temp., shunt",
@@ -594,7 +596,10 @@ id_names: dict[str, list[str]] = {
         "Mischer Kurve, Soll",
     ],
     "integral2_curve_actual": [
-        "Pool temp actual",
+        # r41 never changes on this pump (constant 2 regardless of pool/shunt
+        # activity) - the Curve 2 menu's 'actual' row is not a live measurement
+        # here; the real regulation feedback is supply_shunt_t (r0b)
+        "Curve 2 raw (unused)",
         "Shunt kurva, är",
         "Shuntin käyrä, lämpötila",
         "Shunt kurve, er",
