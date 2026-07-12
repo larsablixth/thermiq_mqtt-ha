@@ -130,6 +130,8 @@ async def update_input_boolean(heatpump) -> None:
 #            )
 
     await platform.async_add_entities(to_add)
+    # Track for removal on config entry unload
+    heatpump._helper_entities.extend(to_add)
     platform.async_register_entity_service(SERVICE_SET_VALUE,{ vol.Required('value'): vol.Coerce(bool)}, "async_set_value")
 
 

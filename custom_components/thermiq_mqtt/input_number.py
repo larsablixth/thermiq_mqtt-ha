@@ -78,7 +78,10 @@ class CustomInputNumber(InputNumber):
         await super().async_set_value(value)
         _LOGGER.debug("async_set: " + self.entity_id)
         # is value updated by GUI?
-        if self.heatpump._hpstate["mqtt_counter"] > -1:
+        # Only send MQTT once we have received data from the heatpump,
+        # otherwise a GUI touch before the first message would write
+        # uninitialized values to the pump
+        if self.heatpump._hpstate["mqtt_counter"] > 0:
             if value != self.heatpump._hpstate[self.reg]:
                 self.heatpump._hpstate[self.reg] = value
                 self.heatpump._hass.bus.fire(
@@ -119,6 +122,8 @@ async def update_input_numbers(heatpump) -> None:
             )
 
     await platform.async_add_entities(to_add)
+    # Track for removal on config entry unload
+    heatpump._helper_entities.extend(to_add)
 
 
 def create_input_number_entity(heatpump, name, value) -> CustomInputNumber:
@@ -170,6 +175,6 @@ def create_input_number_entity(heatpump, name, value) -> CustomInputNumber:
 
     _LOGGER.debug("entity_id:" + entity.entity_id)
     if value is not None:
-        _LOGGER.debug("value:" + value)
+        _LOGGER.debug("value: %s", value)
 
     return entity
