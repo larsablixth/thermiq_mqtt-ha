@@ -9,8 +9,8 @@
     "mqtt",
     "recorder"
   ],
-  "documentation": "https://github.com/thermiq/thermiq_mqtt-ha",
+  "documentation": "https://github.com/larsablixth/thermiq_mqtt-ha",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/thermiq/thermiq_mqtt-ha/issues",
-  "version": "3.1.0"
+  "issue_tracker": "https://github.com/larsablixth/thermiq_mqtt-ha/issues",
+  "version": "3.2.0"
 }
