@@ -68,7 +68,7 @@ def test_reverse_lookup_is_unambiguous_for_writable_registers():
     # Writable registers (number/select/switch) must not share a register
     # number, since the reverse lookup maps register -> single id_name.
     writable = NUMBER_TYPES | {"select_input", "generated_input_boolean"}
-    seen = {}
+    seen: dict[str, str] = {}
     for key, value in reg_id.items():
         if value[FIELD_REGTYPE] in writable:
             reg = value[0]

@@ -1,7 +1,10 @@
 """Component for ThermIQ-MQTT support."""
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime
+from typing import Any
 from sqlalchemy import update, select
 
 from homeassistant.config_entries import ConfigEntry
@@ -48,7 +51,7 @@ PLATFORMS = [
 ]
 
 
-async def async_setup(hass, config):
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up HASL integration"""
     _LOGGER.info("Setup ThermIQ-MQTT integration")
 
@@ -58,13 +61,13 @@ async def async_setup(hass, config):
 
 
 # This call is for the ThermIQ global entry migration, not per-heatpump migration
-async def async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     _LOGGER.info("Migrate ThermIQ-MQTT integration")
     return True
 
 
 async def async_migrate_state_temperature_celsius(
-    hass: HomeAssistant, config_entry
+    hass: HomeAssistant, config_entry: ConfigEntry
 ) -> bool:
     """Migrate sensor state classes with safety checks and logging."""
 
@@ -177,7 +180,7 @@ async def async_migrate_state_temperature_celsius(
 
 
 async def _migrate_celsius(
-    hass: HomeAssistant, recorder, entity_id: str, decimal
+    hass: HomeAssistant, recorder, entity_id: str, decimal: bool
 ) -> bool:
     """
     Migrate statistics metadata for a single entity.
@@ -246,7 +249,9 @@ async def _migrate_celsius(
         return False
 
 
-async def async_migrate_state_class_inc_hour(hass: HomeAssistant, config_entry) -> bool:
+async def async_migrate_state_class_inc_hour(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> bool:
     """Migrate sensor state classes with safety checks and logging."""
 
     # Check if migration has already been run
@@ -467,7 +472,7 @@ async def _migrate_statistics_metadata(
 
     try:
         result = await recorder.async_add_executor_job(_migrate_statistics)
-        return result
+        return bool(result)
     except Exception as e:
         _LOGGER.error(
             "Could not migrate statistics for %s: %s", entity_id, str(e), exc_info=True
@@ -475,7 +480,7 @@ async def _migrate_statistics_metadata(
         return False
 
 
-async def _async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
+async def _async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """
     Main migration entry point.
 
@@ -593,9 +598,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = bool(await hass.config_entries.async_unload_platforms(entry, PLATFORMS))
     if unload_ok:
         worker = hass.data[DOMAIN]
         # Unsubscribe MQTT and remove the generated helper entities so a
@@ -620,22 +625,22 @@ async def reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 class ThermIQWorker:
     """worker object. Stored in hass.data."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the instance."""
         self._hass = hass
-        self._heatpumps = {}
+        self._heatpumps: dict[str, HeatPump] = {}
         self._fetch_callback_listener = None
         self._worker = True
 
     @property
-    def worker(self):
+    def worker(self) -> bool:
         return self._worker
 
     @property
-    def heatpumps(self):
+    def heatpumps(self) -> dict[str, HeatPump]:
         return self._heatpumps
 
-    async def add_entry(self, config_entry: ConfigEntry):
+    async def add_entry(self, config_entry: ConfigEntry) -> HeatPump:
         """Add entry."""
         heatpump = HeatPump(self._hass, config_entry)
         await heatpump.update_config(config_entry)
@@ -646,7 +651,7 @@ class ThermIQWorker:
         )
         return heatpump
 
-    def remove_entry(self, config_entry: ConfigEntry):
+    def remove_entry(self, config_entry: ConfigEntry) -> None:
         """Remove entry."""
         self._hass.bus.fire(
             f"{DOMAIN}_changed",
@@ -654,7 +659,7 @@ class ThermIQWorker:
         )
         self._heatpumps.pop(config_entry.data[CONF_ID])
 
-    async def update_heatpump_entry(self, config_entry: ConfigEntry):
+    async def update_heatpump_entry(self, config_entry: ConfigEntry) -> None:
         heatpump = self._heatpumps[config_entry.data[CONF_ID]]
         await heatpump.update_config(config_entry)
         await self._hass.async_create_task(heatpump.setup_mqtt())

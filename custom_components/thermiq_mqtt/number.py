@@ -6,9 +6,12 @@ unsupported internal API). These are standard NumberEntity instances in the
 `number` domain and update from the shared heatpump state on the msg_rec_event.
 """
 
+from __future__ import annotations
+
 import logging
 
 from homeassistant.components.number import NumberEntity, NumberDeviceClass, NumberMode
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_IDENTIFIERS,
     ATTR_MANUFACTURER,
@@ -16,9 +19,12 @@ from homeassistant.const import (
     ATTR_NAME,
     UnitOfTemperature,
 )
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, MANUFACTURER, DEVVERSION
+from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_REGNUM,
     FIELD_REGTYPE,
@@ -35,7 +41,11 @@ _LOGGER = logging.getLogger(__name__)
 NUMBER_TYPES = ["temperature_input", "time_input", "sensor_input", "generated_input"]
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
     """Set up the ThermIQ number entities for a config entry."""
     heatpump = hass.data[DOMAIN].heatpumps[config_entry.data["id_name"]]
     entities = [
@@ -52,7 +62,7 @@ class ThermIQNumber(NumberEntity):
     _attr_should_poll = False
     _attr_mode = NumberMode.BOX
 
-    def __init__(self, heatpump, key):
+    def __init__(self, heatpump: HeatPump, key: str) -> None:
         self._heatpump = heatpump
         self._hpstate = heatpump._hpstate
         self._key = key
@@ -83,12 +93,12 @@ class ThermIQNumber(NumberEntity):
         }
 
     @property
-    def available(self):
+    def available(self) -> bool:
         """Unavailable until the first message and while the pump is silent."""
         return self._heatpump.available
 
     @property
-    def native_value(self):
+    def native_value(self) -> float | None:
         """Current register value, or None until the first MQTT message."""
         value = self._hpstate.get(self._reg)
         if isinstance(value, (int, float)):
@@ -111,7 +121,7 @@ class ThermIQNumber(NumberEntity):
             )
             await self._heatpump.send_mqtt_reg(self._key, value, 0xFFFF)
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Refresh state on each heatpump message; auto-removed on unload."""
         self.async_on_remove(
             self.hass.bus.async_listen(
@@ -120,5 +130,5 @@ class ThermIQNumber(NumberEntity):
             )
         )
 
-    async def _async_update_event(self, event):
+    async def _async_update_event(self, event: Event) -> None:
         self.async_write_ha_state()

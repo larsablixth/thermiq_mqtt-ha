@@ -29,7 +29,8 @@ jobs:
         - uses: "actions/setup-python@v5"
           with:
             python-version: "3.x"
-        - run: python3 -m pip install "black==25.11.0"
+        # Single source of truth for the black pin: requirements_test.txt
+        - run: python3 -m pip install "$(grep '^black==' requirements_test.txt)"
         - run: black --check .
 
   test:
@@ -42,4 +43,6 @@ jobs:
             python-version: "3.13"
         - run: python3 -m pip install -r requirements_test.txt
         - run: python3 -m pytest tests -v
+        - name: Type check
+          run: python3 -m mypy
 

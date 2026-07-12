@@ -4,18 +4,24 @@ Replaces injection into Home Assistant's built-in input_select platform.
 Standard SelectEntity instances in the `select` domain.
 """
 
+from __future__ import annotations
+
 import logging
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_IDENTIFIERS,
     ATTR_MANUFACTURER,
     ATTR_MODEL,
     ATTR_NAME,
 )
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, MANUFACTURER, DEVVERSION
+from .heatpump import HeatPump
 from .heatpump.thermiq_regs import (
     FIELD_REGNUM,
     FIELD_REGTYPE,
@@ -29,7 +35,11 @@ _LOGGER = logging.getLogger(__name__)
 MODE_VALUES = [0, 1, 2, 3, 4]
 
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
     """Set up the ThermIQ select entities for a config entry."""
     heatpump = hass.data[DOMAIN].heatpumps[config_entry.data["id_name"]]
     entities = [
@@ -45,7 +55,7 @@ class ThermIQSelect(SelectEntity):
 
     _attr_should_poll = False
 
-    def __init__(self, heatpump, key):
+    def __init__(self, heatpump: HeatPump, key: str) -> None:
         self._heatpump = heatpump
         self._hpstate = heatpump._hpstate
         self._key = key
@@ -72,14 +82,16 @@ class ThermIQSelect(SelectEntity):
         }
 
     @property
-    def available(self):
+    def available(self) -> bool:
         """Unavailable until the first message and while the pump is silent."""
         return self._heatpump.available
 
     @property
-    def current_option(self):
+    def current_option(self) -> str | None:
         """Return the current option, or None if unknown/unmapped."""
         value = self._hpstate.get(self._reg)
+        if value is None:
+            return None
         try:
             return self._option_by_value.get(int(value))
         except (TypeError, ValueError):
@@ -101,7 +113,7 @@ class ThermIQSelect(SelectEntity):
             )
             await self._heatpump.send_mqtt_reg(self._key, value, 0xFFFF)
 
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         self.async_on_remove(
             self.hass.bus.async_listen(
                 f"{self._heatpump._domain}_{self._heatpump._id}_msg_rec_event",
@@ -109,5 +121,5 @@ class ThermIQSelect(SelectEntity):
             )
         )
 
-    async def _async_update_event(self, event):
+    async def _async_update_event(self, event: Event) -> None:
         self.async_write_ha_state()
