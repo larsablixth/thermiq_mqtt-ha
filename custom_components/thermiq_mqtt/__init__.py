@@ -616,6 +616,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry
+) -> bool:
+    """Allow removing devices from the UI/registry.
+
+    The integration no longer creates devices (entity names would get the
+    device name prefixed), so any remaining device entry is stale and may
+    always be removed.
+    """
+    return True
+
+
 async def reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if DOMAIN in hass.data:
         worker = hass.data[DOMAIN]
