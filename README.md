@@ -34,6 +34,9 @@ From v3.x:
    2. Use hexformat only if you have the old 1.xx ThermIQ-MQTT firmware 
    3. Use debug if you want to try it out without actually writing to the heatpump
 8. To control and monitor the heatpump from your dashboard:
+
+   *Alternative:* an [animated SVG widget](lovelace/README.md) (live temperatures as pipe colors, flow arrows, scroll-compressor animation) is available in the [lovelace/](lovelace/) folder — it replaces steps 1, 5 and 6 below and needs no HACS frontend dependencies for the visualization itself.
+
    1. HACS->Frontend->Explore/Add [HTML Jinja2 Template card](https://github.com/PiotrMachowski/Home-Assistant-Lovelace-HTML-Jinja2-Template-card)
    2. HACS->Frontend->Explore/Add [Number Box](https://github.com/htmltiger/numberbox-card)
    3. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
