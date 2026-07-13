@@ -59,12 +59,15 @@ load.
 
 ## Optional extras
 
-**Pool / secondary shunt circuit.** If you use the Curve 2 shunt circuit
-(e.g. for a pool), define a template binary sensor named
-`binary_sensor.pool_heating_active`; while it is `on` the widget draws
-the secondary heat-exchanger branch with flow animation. Without the
-sensor the branch is simply never drawn. Example (strict "actually
-heating right now" semantics):
+**Pool / secondary shunt circuit.** This requires the optional shunt
+group extension card in the heat pump (a Thermia accessory — most pumps
+don't have it; it drives the Curve 2 / `integral2_*` registers). If you
+don't have the card, skip this section: the widget never draws the pool
+branch. If you do use the shunt circuit (e.g. for a pool), define a
+template binary sensor named `binary_sensor.pool_heating_active`; while
+it is `on` the widget draws the secondary heat-exchanger branch with
+flow animation. Example (strict "actually heating right now"
+semantics):
 
 ```yaml
 template:
