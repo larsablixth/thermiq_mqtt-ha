@@ -129,3 +129,62 @@ async def test_switch_write_ignored_without_data():
     entity = ThermIQSwitch(hp, "heatpump_evu_block")
     await entity.async_turn_on()
     hp.send_mqtt_reg.assert_not_awaited()
+
+
+# --- Binary sensor -----------------------------------------------------
+
+
+def _make_binary(hp, key="compressor_on"):
+    from custom_components.thermiq_mqtt.binary_sensor import HeatPumpBinarySensor
+    from custom_components.thermiq_mqtt.heatpump.thermiq_regs import (
+        FIELD_BITMASK,
+        FIELD_REGNUM,
+        reg_id,
+    )
+
+    return HeatPumpBinarySensor(
+        hp._hass, hp, key, reg_id[key][FIELD_REGNUM], key, reg_id[key][FIELD_BITMASK]
+    )
+
+
+async def test_binary_sensor_unknown_until_data_then_bitmask():
+    hp = _make_heatpump()
+    ent = _make_binary(hp)  # compressor_on = r10 bit 0x0002
+    ent.hass = hp._hass
+    ent.async_write_ha_state = MagicMock()
+    assert ent._attr_is_on is None  # unknown, not off
+    hp._hpstate["r10"] = 0x0002
+    await ent._async_update_event(None)
+    assert ent._attr_is_on is True
+    hp._hpstate["r10"] = 0x0000
+    await ent._async_update_event(None)
+    assert ent._attr_is_on is False
+
+
+async def test_binary_sensor_none_register_reports_unknown():
+    hp = _make_heatpump()
+    ent = _make_binary(hp)
+    ent.hass = hp._hass
+    ent.async_write_ha_state = MagicMock()
+    hp._hpstate["r10"] = 1  # known ...
+    await ent._async_update_event(None)
+    hp._hpstate["r10"] = None  # ... then register disappears
+    await ent._async_update_event(None)
+    assert ent._attr_is_on is None
+
+
+async def test_binary_sensor_writes_on_availability_transition_only():
+    hp = _make_heatpump()
+    ent = _make_binary(hp)
+    ent.hass = hp._hass
+    ent.async_write_ha_state = MagicMock()
+    hp._hpstate["r10"] = 0x0002
+    await ent._async_update_event(None)
+    assert ent.async_write_ha_state.call_count == 1
+    # unchanged value + unchanged availability -> no write
+    await ent._async_update_event(None)
+    assert ent.async_write_ha_state.call_count == 1
+    # availability flips (pump goes silent) -> write even though value unchanged
+    hp._last_message_time = None
+    await ent._async_update_event(None)
+    assert ent.async_write_ha_state.call_count == 2

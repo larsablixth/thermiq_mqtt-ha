@@ -299,8 +299,15 @@ class HeatPump:
         register = reg_id[register_id][0]
         _LOGGER.debug("register:[%s]", register)
 
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            _LOGGER.error("No MQTT message sent due to missing value:[%s]", value)
+        if isinstance(value, bool):
+            # Templated service calls render true/false as Python bools
+            value = int(value)
+        if not isinstance(value, (int, float)):
+            _LOGGER.error(
+                "No MQTT message sent: value [%s] for register [%s] is not numeric",
+                value,
+                register_id,
+            )
             return
 
         if bitmask is None:
@@ -340,6 +347,15 @@ class HeatPump:
                     max_value,
                 )
                 return
+        else:
+            # Read-only or unknown register types are never writable; without
+            # this branch they would bypass validation entirely
+            _LOGGER.error(
+                "No MQTT message sent: register [%s] (type %s) is not writable",
+                register_id,
+                regtype,
+            )
+            return
 
         ## check the bitmask
         # value = value | bitmask

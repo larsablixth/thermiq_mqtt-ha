@@ -109,4 +109,8 @@ class ThermIQSelect(SelectEntity):
         )
 
     async def _async_update_event(self, event: Event) -> None:
-        self.async_write_ha_state()
+        # Write on value change OR availability transition only
+        snapshot = (self._hpstate.get(self._reg), self._heatpump.available)
+        if snapshot != getattr(self, "_last_snapshot", None):
+            self._last_snapshot = snapshot
+            self.async_write_ha_state()

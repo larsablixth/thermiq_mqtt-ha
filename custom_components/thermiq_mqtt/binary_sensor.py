@@ -162,10 +162,13 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         _LOGGER.debug("update: %s", self._idx)
         reg_state = self._hpstate.get(self._vp_reg)
         if reg_state is None:
-            _LOGGER.warning("Could not get data for %s", self._idx)
+            # None stays None so HA shows 'unknown', matching the event path
+            self._state = None
+            self._attr_is_on = None
         else:
             self._state = (int(reg_state) & self._bitmask) > 0
             self._attr_is_on = self._state
+        self._last_available = self._heatpump.available
 
     async def _async_update_event(self, event: Event) -> None:
         """Update the new state of the sensor."""

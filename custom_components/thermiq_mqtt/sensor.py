@@ -262,8 +262,9 @@ class HeatPumpSensor(SensorEntity):
 
         _LOGGER.debug("update: %s", self._idx)
         self._state = self._hpstate.get(self._vp_reg)
+        self._last_available = self._heatpump.available
         if self._state is None:
-            _LOGGER.warning("Could not get data for %s", self._idx)
+            _LOGGER.debug("No data yet for %s", self._idx)
 
     async def _async_update_event(self, event: Event) -> None:
         """Update the new state of the sensor."""
