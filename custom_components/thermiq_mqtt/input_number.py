@@ -55,7 +55,7 @@ class CustomInputNumber(InputNumber):
     async def async_added_to_hass(self):
         """Run when entity about to be added to hass."""
         #await super().async_added_to_hass()
-        if self._current_value is not None:
+        if self._attr_native_value is not None:
             return
 
         value: float | None = None
@@ -64,18 +64,18 @@ class CustomInputNumber(InputNumber):
                 value = float(state.state)
 
         # Check against None because value can be 0
-        if value is not None and self._minimum <= value <= self._maximum:
-            self._current_value = value
+        if value is not None and self.native_min_value <= value <= self.native_max_value:
+            self._attr_native_value = value
         else:
-            self._current_value = None #Keep as none to maintain historic values and avoid gaps when starting up. Will get a value with first mqtt message
+            self._attr_native_value = None #Keep as none to maintain historic values and avoid gaps when starting up. Will get a value with first mqtt message
 
     async def async_internal_will_remove_from_hass(self):
         await Entity.async_internal_will_remove_from_hass(self)
 
-    async def async_set_value(self, value):
+    async def async_set_native_value(self, value):
         _LOGGER.debug("inp %s", self.entity_id)
         # We require that we have values from the hp before allowing updates from GUI
-        await super().async_set_value(value)
+        await super().async_set_native_value(value)
         _LOGGER.debug("async_set: " + self.entity_id)
         # is value updated by GUI?
         if self.heatpump._hpstate["mqtt_counter"] > -1:
