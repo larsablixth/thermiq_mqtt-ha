@@ -212,7 +212,7 @@ async def _migrate_celsius(hass: HomeAssistant, recorder, entity_id: str, decima
             return False
 
     try:
-        result = recorder.async_add_executor_job(_update_celsius)
+        result = await recorder.async_add_executor_job(_update_celsius)
         return result
     except Exception as e:
         _LOGGER.error("Could not update celsius for %s: %s", entity_id, str(e), exc_info=True)
@@ -522,10 +522,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.async_create_task(setup_input_selects(heatpump))
     hass.async_create_task(setup_input_booleans(heatpump))
 
-    # Load the platforms for heatpump
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    )
+    # Load the sensor/binary_sensor platforms and await them so the entities
+    # are fully set up before this entry is marked done (avoids races where
+    # consumers access the platform data before it is ready)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Wait for hass to start and then add the input_* entities
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, handle_hass_started)

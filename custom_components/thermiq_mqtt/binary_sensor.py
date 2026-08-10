@@ -49,6 +49,45 @@ from functools import cached_property
 
 _LOGGER = logging.getLogger(__name__)
 
+_DEVICE_CLASS_MAP = {
+    # Pumps and compressor
+    "compressor_on":          BinarySensorDeviceClass.RUNNING,
+    "brine_pump_on":          BinarySensorDeviceClass.RUNNING,
+    "supply_pump_on":         BinarySensorDeviceClass.RUNNING,
+    "hotwaterproduction_on":  BinarySensorDeviceClass.RUNNING,
+    "active_cooling_on":      BinarySensorDeviceClass.RUNNING,
+    "passive_cooling_on":     BinarySensorDeviceClass.RUNNING,
+    # Electric heating elements
+    "boiler_3kw_on":          BinarySensorDeviceClass.HEAT,
+    "boiler_6kw_on":          BinarySensorDeviceClass.HEAT,
+    "aux1_heating_on":        BinarySensorDeviceClass.HEAT,
+    "aux2_heating_on":        BinarySensorDeviceClass.HEAT,
+    # Alarms
+    "alarm_indication_on":    BinarySensorDeviceClass.PROBLEM,
+    "highpressure_alm":       BinarySensorDeviceClass.PROBLEM,
+    "lowpressure_alm":        BinarySensorDeviceClass.PROBLEM,
+    "motorbreaker_alm":       BinarySensorDeviceClass.PROBLEM,
+    "brine_flow_alm":         BinarySensorDeviceClass.PROBLEM,
+    "brine_temperature_alm":  BinarySensorDeviceClass.PROBLEM,
+    "outdoor_sensor_alm":     BinarySensorDeviceClass.PROBLEM,
+    "supplyline_sensor_alm":  BinarySensorDeviceClass.PROBLEM,
+    "returnline_sensor_alm":  BinarySensorDeviceClass.PROBLEM,
+    "boiler_sensor_alm":      BinarySensorDeviceClass.PROBLEM,
+    "indoor_sensor_alm":      BinarySensorDeviceClass.PROBLEM,
+    "phase_order_alm":        BinarySensorDeviceClass.PROBLEM,
+    "overheating_alm":        BinarySensorDeviceClass.PROBLEM,
+    # Installed add-ons
+    "opt_phasemeassure_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_2_installed":        BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_hgw_installed":      BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_4_installed":        BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_5_installed":        BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_6_installed":        BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_optimum_installed":  BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_flowguard_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    # shunt1_n/p, shunt2_n/p, shunt_cooling_n/p, heatpump_evu_block: no device class
+}
+
 
 async def async_setup_entry(
     hass, config_entry, async_add_entities, discovery_info=None
@@ -164,13 +203,13 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         """Return the device class of the sensor."""
         return self._vp_reg
 
-    @cached_property
+    @property
     def is_on(self) -> bool:
         return (self._state==True)
 
     @property
     def sorter(self):
-        """Return the state of the sensor."""
+        """Return the sorting order of the sensor."""
         return self._sorter
 
     @property
@@ -211,7 +250,6 @@ class HeatPumpBinarySensor(BinarySensorEntity):
             self.async_schedule_update_ha_state()
             _LOGGER.debug("async_update_ha: %s: [%s]",self._idx, str(bool_state))
 
-    @property
-    def device_class(self):
+def device_class(self):
         """Return the class of this device."""
-        return f"{DOMAIN}_HeatPumpSensor"
+        return _DEVICE_CLASS_MAP.get(self._idx)

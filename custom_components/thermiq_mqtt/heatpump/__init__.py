@@ -251,13 +251,16 @@ class HeatPump:
         self._id = entry.data[CONF_ID]
         self._id_reg = {}
         self.unsubscribe_callback = None
-
+        # Generated input_number/input_select/input_boolean entities,
+        # tracked so they can be removed when the entry is unloaded
+        self._helper_entities = []
 
         # Create reverse lookup dictionary (id_reg->reg_number)
-
+		# Registers start as None (unknown) until the first MQTT message;
+        # -1 would make every bitmask test true and light up all alarms
         for k, v in reg_id.items():
             self._id_reg[v[0]] = k
-            self._hpstate[v[0]] = -1
+            self._hpstate[v[0]] = None
 
     async def setup_mqtt(self):
         self._hpstate["time_str"] = self._data_topic
@@ -315,7 +318,7 @@ class HeatPump:
     def get_value(self, item):
         """Get value for sensor."""
         res = self._hpstate.get(item)
-        _LOGGER.debug("get_value(" + item + ")=%d", res)
+         _LOGGER.debug("get_value(%s)=%s", item, res)
         return res
 
     def update_state(self, command, state_command):
