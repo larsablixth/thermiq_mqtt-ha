@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - dev
+  # Also validate pull requests: without this, HACS validation, hassfest and
+  # black --check only ran after a branch was already merged into master
+  pull_request:
 
 jobs:
   validate:
