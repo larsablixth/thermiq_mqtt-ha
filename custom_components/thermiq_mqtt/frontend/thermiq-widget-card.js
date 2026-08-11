@@ -9,17 +9,17 @@
  *
  * Usage (as an entities-card row or a standalone card):
  *   type: custom:thermiq-widget-card
- *   template_url: /local/thermiq/heatpump_widget.j2   # default
+ *   template_url: /thermiq_mqtt_frontend/heatpump_widget.j2   # default
  *   entity_prefix: thermiq_mqtt_vp1                   # default; set to
  *                          # thermiq_mqtt_<id> if your entry id isn't vp1
  *
- * Editing workflow: edit www/thermiq/heatpump_widget.j2 in the config
- * repo, push it to /config/www/thermiq/ on the HA host, reload the page.
- * No lovelace-storage surgery needed.
+ * Editing workflow: edit heatpump_widget.j2 next to this file in the
+ * integration folder and reload the page. The integration serves this
+ * directory with caching disabled, so no cache-busting is needed.
  */
 
 const VERSION = "1.1.0";
-const DEFAULT_URL = "/local/thermiq/heatpump_widget.j2";
+const DEFAULT_URL = "/thermiq_mqtt_frontend/heatpump_widget.j2";
 const DEFAULT_PREFIX = "thermiq_mqtt_vp1"; // integration domain + entry id
 
 /* ---- DOM morphing ------------------------------------------------- */
