@@ -84,8 +84,35 @@ with caching disabled so edits show up immediately.
 
 **Upgrading from a manual install.** If you previously copied the files into
 `www/thermiq/` and registered `/local/thermiq/thermiq-widget-card.js` as a
-resource, remove that resource and delete the copies, or the card is loaded
-twice from two different versions.
+resource, three things need undoing:
+
+1. Remove the `/local/thermiq/thermiq-widget-card.js` resource from
+   *Settings → Dashboards → ⋮ → Resources*, or the card is loaded twice from
+   two different versions.
+2. Delete `/config/www/thermiq/`.
+3. **Check your card for a `template_url:` line and delete it.** Earlier
+   instructions had you point the card at `/local/thermiq/heatpump_widget.j2`.
+   That path no longer exists, so a card still pinning it fails to load its
+   template. Left alone, the card uses the path the integration serves.
+
+Your card config should be just:
+
+```yaml
+type: custom:thermiq-widget-card
+```
+
+**If a card shows "Configuration error"**, two Home Assistant behaviours are
+worth knowing, because between them they cost me a night on this card:
+
+- Home Assistant renders only that generic string on the card face. The real
+  message ("Custom element doesn't exist: …") appears **only** when you click
+  the pencil to edit the dashboard.
+- A failed module load is cached by the browser for the lifetime of the tab,
+  and Home Assistant does not retry it. If you loaded the page while Home
+  Assistant was restarting - or during the window at startup where the web
+  server answers before custom integrations have registered their paths - the
+  card stays broken until you load the page again with Home Assistant fully
+  up, no matter what you fix in between.
 
 ## Optional extras
 

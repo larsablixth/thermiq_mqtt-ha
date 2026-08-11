@@ -1,7 +1,7 @@
 /* thermiq-widget-card
  *
  * Renders the ThermIQ heat-pump SVG widget from a Jinja2 template file
- * served out of /config/www, using HA's render_template websocket
+ * served by the integration, using HA's render_template websocket
  * subscription. Updates are applied by DOM *morphing* (in-place diff of
  * attributes and text nodes) instead of innerHTML replacement, so CSS
  * animations keep running across re-renders — the pump clock can tick
@@ -9,18 +9,49 @@
  *
  * Usage (as an entities-card row or a standalone card):
  *   type: custom:thermiq-widget-card
- *   template_url: /thermiq_mqtt_frontend/heatpump_widget.j2   # default
  *   entity_prefix: thermiq_mqtt_vp1                   # default; set to
  *                          # thermiq_mqtt_<id> if your entry id isn't vp1
+ *
+ * There is also a template_url option, but do not set it. It defaults to the
+ * path the integration serves, and pinning a path in card config means the
+ * card breaks the next time that path changes - which is exactly what
+ * happened when the template moved out of www/ and into the integration.
  *
  * Editing workflow: edit heatpump_widget.j2 next to this file in the
  * integration folder and reload the page. The integration serves this
  * directory with caching disabled, so no cache-busting is needed.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.1.1";
 const DEFAULT_URL = "/thermiq_mqtt_frontend/heatpump_widget.j2";
 const DEFAULT_PREFIX = "thermiq_mqtt_vp1"; // integration domain + entry id
+
+/* ---- Template loading ---------------------------------------------- */
+
+// Home Assistant instantiates a card element several times while laying a
+// dashboard out, and each instance used to fetch the 34 kB template again.
+// One in-flight request per URL is shared instead. Still one fetch per page
+// load, so editing the template and reloading still shows the change.
+const templateRequests = new Map();
+
+function loadTemplate(url) {
+  let pending = templateRequests.get(url);
+  if (!pending) {
+    pending = fetch(url, { cache: "no-store" })
+      .then((resp) => {
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.text();
+      })
+      .catch((err) => {
+        // never cache a failure - a transient error would otherwise stick
+        // for the lifetime of the page
+        templateRequests.delete(url);
+        throw err;
+      });
+    templateRequests.set(url, pending);
+  }
+  return pending;
+}
 
 /* ---- DOM morphing ------------------------------------------------- */
 
@@ -135,9 +166,7 @@ class ThermiqWidgetCard extends HTMLElement {
     this._root = document.createElement("div");
     this.appendChild(this._root);
     try {
-      const resp = await fetch(this._config.template_url, { cache: "no-store" });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      this._template = await resp.text();
+      this._template = await loadTemplate(this._config.template_url);
       const prefix = this._config.entity_prefix || DEFAULT_PREFIX;
       if (prefix !== DEFAULT_PREFIX) {
         this._template = this._template.split(DEFAULT_PREFIX).join(prefix);
