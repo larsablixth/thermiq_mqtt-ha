@@ -34,9 +34,9 @@ From v3.x:
 8. Restart HA
   
 9. Go to Integrations and add ThermIQ.
-   1. ![configuration](docs/config_small.jpg)
+   1. ![configuration](docs/config_dialog.svg)
 
-      > **Note:** this screenshot predates the current dialog. It shows five fields with *Language* as a text box; the dialog now has six, *Language* is a dropdown, and there is an extra migration option. The list below is authoritative.
+      > *Schematic of the config dialog, generated from the integration's config flow — field order, labels and defaults match the code. It is a diagram rather than a screenshot, so Home Assistant's own styling will differ slightly.*
 
    2. **Unique ID** &mdash; identifies this heatpump, default **vp1**. It is embedded verbatim in every entity id (`sensor.thermiq_mqtt_vp1_...`), so choose it before building dashboards &mdash; changing it later renames every entity. Only lowercase letters, digits and underscores are accepted. Use a different value for each heatpump if you set up more than one.
    3. **MQTT Nodename** &mdash; the same as you set during wifi-config in step 3, without a "/" at the end
