@@ -1,5 +1,7 @@
 # Home Assistant ThermIQ Integration
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom_Repository-orange.svg)](https://github.com/custom-components/hacs)
+
+> **This is a maintained fork** of [ThermIQ/thermiq_mqtt-ha](https://github.com/ThermIQ/thermiq_mqtt-ha) with additional bug fixes. It is **not** in the HACS default list, so it must be added as a custom repository — see step 7 below.
 
 ![Screenshot](docs/Lovelace1.jpg)
 
@@ -21,30 +23,39 @@ From v3.x:
 1. Install the Mosquitto Add-on in Home Assistant.
 2. Install [MQTT Explorer](https://mqtt-explorer.com/) on your PC and verify that you can connect to Mosquitto
 3. Configure your **ThermIQ** device according to the instructions at [Thermiq.net](https://thermiq.net)
-1. Use MQTT-Explorer to verify that your **ThermIQ** device is sending information to Mosquitto. You should see MQTT messages in MQTT-Explorer from the heatpump every 30s
-2. Install the MQTT Integration in Home Assistant and verify that it's communicating with the Mosquitto Add-on.
-3. Install [HACS](https://github.com/custom-components/hacs)
-5. Click  [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ThermIQ&repository=thermiq_mqtt-ha&category=integration) to install the ThermIQ-MQTT integration   
-  or Go to the HACS integrations page, add ThermIQ integration.
-6. Restart HA  
+4. Use MQTT-Explorer to verify that your **ThermIQ** device is sending information to Mosquitto. You should see MQTT messages in MQTT-Explorer from the heatpump every 30s
+5. Install the MQTT Integration in Home Assistant and verify that it's communicating with the Mosquitto Add-on.
+6. Install [HACS](https://github.com/custom-components/hacs)
+7. Add this fork as a HACS **custom repository**: HACS &rarr; the &#8942; menu (top right) &rarr; *Custom repositories* &rarr; paste `https://github.com/larsablixth/thermiq_mqtt-ha`, category *Integration*, then **Add**.
+   This step is required: this fork is not in the HACS default list, and without it HACS will offer the upstream ThermIQ version instead of this one.
+
+   Then click [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=larsablixth&repository=thermiq_mqtt-ha&category=integration) to open it in HACS and install the ThermIQ-MQTT integration,
+   or go to the HACS integrations page and add the ThermIQ integration from there.
+8. Restart HA
   
-7. Go to Integrations and add ThermIQ.
+9. Go to Integrations and add ThermIQ.
    1. ![configuration](docs/config_small.jpg)
-   1. The MQTT Nodename should be the same as you set during wifi-config in step 3, without a "/" at the end
-   2. Use hexformat only if you have the old 1.xx ThermIQ-MQTT firmware 
-   3. Use debug if you want to try it out without actually writing to the heatpump
-8. To control and monitor the heatpump from your dashboard:
+
+      > **Note:** this screenshot predates the current dialog. It shows five fields with *Language* as a text box; the dialog now has six, *Language* is a dropdown, and there is an extra migration option. The list below is authoritative.
+
+   2. **Unique ID** &mdash; identifies this heatpump, default **vp1**. It is embedded verbatim in every entity id (`sensor.thermiq_mqtt_vp1_...`), so choose it before building dashboards &mdash; changing it later renames every entity. Only lowercase letters, digits and underscores are accepted. Use a different value for each heatpump if you set up more than one.
+   3. **MQTT Nodename** &mdash; the same as you set during wifi-config in step 3, without a "/" at the end
+   4. **Language** &mdash; language used for the entity friendly names. One of `en`, `se`, `fi`, `no`, `de`.
+   5. **Use hexformat for registers in MQTT** &mdash; only if you have the old 1.xx ThermIQ-MQTT firmware
+   6. **Enable MQTT debug** &mdash; diverts all writes to the `dbg_write` / `dbg_set` topics, so you can try the integration out without actually writing to the heatpump
+   7. **Request migration of old data in recorder database** &mdash; only needed when upgrading from an older version whose recorded units or entity ids differ. It rewrites history in the recorder database and may take a long time on a large database. Leave it **off** for a fresh install.
+10. To control and monitor the heatpump from your dashboard:
 
    *Alternative:* an [animated SVG widget](lovelace/README.md) (live temperatures as pipe colors, flow arrows, scroll-compressor animation) is available in the [lovelace/](lovelace/) folder — it replaces steps 1, 5 and 6 below and needs no HACS frontend dependencies for the visualization itself.
 
    1. HACS->Frontend->Explore/Add [HTML Jinja2 Template card](https://github.com/PiotrMachowski/Home-Assistant-Lovelace-HTML-Jinja2-Template-card)
    2. HACS->Frontend->Explore/Add [Number Box](https://github.com/htmltiger/numberbox-card)
    3. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
-   4. HACS->Frontend->Explore/Add [apexcharts-card]https://github.com/RomRider)
+   4. HACS->Frontend->Explore/Add [apexcharts-card](https://github.com/RomRider/apexcharts-card)
    5. Download/save the images [vp_base.png](vp_base.png), [vp_base_hgwon.png](vp_base_hgwon.png) and [vp_base_hw.png](vp_base_hw.png)
    6. Upload the downloaded files to your Home Assistant machine to either the folder **www/community/** or (**local/community/**)
    7. Go to your dashboard and add a new manual card
-   8. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/ThermIQ/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
+   8. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
    9. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
   
 ### Debugging
@@ -180,7 +191,7 @@ data: {"entity_id": "input_number.thermiq_mqtt_vp1_indoor_requested_t", "value":
 ```
 
 #### Available data
-The data available is listed in [REGISTERS.md](https://github.com/ThermIQ/thermiq_mqtt-ha/blob/master/REGISTERS.md)
+The data available is listed in [REGISTERS.md](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/REGISTERS.md)
 
 #### Forced legionella heating
 See this [thread](https://github.com/ThermIQ/thermiq_mqtt-ha/issues/66#issuecomment-3594762404) for a possible way of forcing a legionella run when energy is cheap
@@ -198,7 +209,7 @@ If you are looking for a Domoticz version, it's available from Jack: [Domoticz](
 
 # Contributing
 Contributions are welcome! If you'd like to contribute, feel free to pick up anything on the current [GitHub issues](https://github.com/ThermIQ/thermiq_mqtt-ha/issues) list!
-The naming, translation and grouping of registers can be improved, your input is appreciated. Most of it is in the [thermiq_regs.py](https://github.com/ThermIQ/thermiq_mqtt-ha/blob/master/custom_components/thermiq_mqtt/heatpump/thermiq_regs.py)  
+The naming, translation and grouping of registers can be improved, your input is appreciated. Most of it is in the [thermiq_regs.py](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/custom_components/thermiq_mqtt/heatpump/thermiq_regs.py)  
 
 All help improving the integration is appreciated!
 
