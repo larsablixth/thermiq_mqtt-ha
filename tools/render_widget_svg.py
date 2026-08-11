@@ -296,7 +296,11 @@ def build_badges(html: str) -> list[tuple[int, str]]:
         if wm:
             w = float(wm.group(1))
         bg, fg = (VAL_BG, VAL_FG) if kind == "val" else (VALD_BG, VALD_FG)
-        z = int(re.search(r"z-index\s*:\s*(\d+)", style).group(1)) if "z-index" in style else 0
+        z = (
+            int(re.search(r"z-index\s*:\s*(\d+)", style).group(1))
+            if "z-index" in style
+            else 0
+        )
 
         text = re.sub(
             r"<span class=\"hpwidget-unit-spand?\">(.*?)</span>", "\x00" + r"\1", inner
@@ -314,9 +318,19 @@ def build_badges(html: str) -> list[tuple[int, str]]:
                 '<text x="%.1f" y="%.1f" font-size="%g" fill="%s" text-anchor="middle">'
                 '%s<tspan font-size="%g" fill="%s">%s</tspan></text>'
                 % (
-                    left, top, w, h, bg,
-                    cx, top + BASELINE, BADGE_FONT, fg, esc(value),
-                    UNIT_FONT, UNIT_FG, esc(unit),
+                    left,
+                    top,
+                    w,
+                    h,
+                    bg,
+                    cx,
+                    top + BASELINE,
+                    BADGE_FONT,
+                    fg,
+                    esc(value),
+                    UNIT_FONT,
+                    UNIT_FG,
+                    esc(unit),
                 ),
             )
         )
@@ -364,7 +378,9 @@ def build_roof(html: str) -> str:
 
 
 def compose(html: str) -> str:
-    _, schem_inner = inner_svg(html, r'<svg style="height:300px;overflow:visible;"[^>]*>')
+    _, schem_inner = inner_svg(
+        html, r'<svg style="height:300px;overflow:visible;"[^>]*>'
+    )
     # Arrows must be resolved before animations are stripped - their position
     # is encoded in the very animation declaration strip_animations removes.
     schem_inner = strip_animations(resolve_arrows(schem_inner))
@@ -425,7 +441,7 @@ def main():
             "#card{position:relative;width:%dpx;height:%dpx;background:#fff;"
             "border-radius:10px;overflow:hidden;"
             'font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif}'
-            "</style></head><body><div id=\"card\">%s</div></body></html>"
+            '</style></head><body><div id="card">%s</div></body></html>'
             % (CARD_W, CARD_H, html)
         )
         print("wrote %s" % args.html)
