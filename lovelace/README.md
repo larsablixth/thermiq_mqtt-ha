@@ -5,7 +5,7 @@ replacement for the PNG-based visualization in `ThermIQ_Card.yaml`.
 
 The whole machine is drawn as one SVG: cabinet, brine loop, evaporator,
 scroll compressor, condenser, hot-water tank, 3-way valve, radiator
-circuit and (optionally) a pool/secondary shunt circuit.
+circuit and (optionally) a pool / second heating circuit.
 
 Everything on screen tells the truth about the machine:
 
@@ -89,15 +89,20 @@ twice from two different versions.
 
 ## Optional extras
 
-**Pool / secondary shunt circuit.** This requires the optional shunt
-group extension card in the heat pump (a Thermia accessory — most pumps
-don't have it; it drives the Curve 2 / `integral2_*` registers). If you
-don't have the card, skip this section: the widget never draws the pool
-branch. If you do use the shunt circuit (e.g. for a pool), define a
-template binary sensor named `binary_sensor.pool_heating_active`; while
-it is `on` the widget draws the secondary heat-exchanger branch with
-flow animation. Example (strict "actually heating right now"
-semantics):
+**Pool / second heating circuit.** This needs an optional expansion card
+fitted in the heat pump — most pumps don't have one. It provides the
+second heating circuit, which the pump calls **Curve 2** and which this
+integration exposes as the `integral2_*` registers (curve slope, min,
+max, target, actual). Note this is a separate thing from the pump's
+`shunt1_*` / `shunt2_*` / `shunt_cooling_*` signals, which exist on
+pumps without the expansion card.
+
+If you don't have the card, skip this section: the widget never draws
+the pool branch. If you do use the second circuit (e.g. for a pool),
+define a template binary sensor named
+`binary_sensor.pool_heating_active`; while it is `on` the widget draws
+the secondary heat-exchanger branch with flow animation. Example
+(strict "actually heating right now" semantics):
 
 ```yaml
 template:
