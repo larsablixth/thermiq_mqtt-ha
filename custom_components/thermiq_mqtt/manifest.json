@@ -7,7 +7,9 @@
   "config_flow": true,
   "dependencies": [
     "mqtt",
-    "recorder"
+    "recorder",
+    "http",
+    "frontend"
   ],
   "documentation": "https://github.com/larsablixth/thermiq_mqtt-ha",
   "integration_type": "hub",

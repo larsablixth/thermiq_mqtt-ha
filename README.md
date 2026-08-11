@@ -55,16 +55,18 @@ From v3.x:
 
    The visualization is the [animated SVG widget](lovelace/README.md) — live temperatures as pipe colours, flow arrows that appear only when the medium actually moves, and an orbiting scroll compressor. It replaced the old PNG-based picture in v3.5.0; see [Upgrading the dashboard card](#upgrading-the-dashboard-card) if you are coming from an earlier version.
 
-   1. Copy `heatpump_widget.j2` and `thermiq-widget-card.js` from [lovelace/](lovelace/) to **www/thermiq/** on your Home Assistant machine
-   2. Register the card: *Settings &rarr; Dashboards &rarr; &#8942; &rarr; Resources &rarr; Add*, URL `/local/thermiq/thermiq-widget-card.js?v=1.1.0`, type *JavaScript module*
-   3. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
-   4. Go to your dashboard and add a new manual card
-   5. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
-   6. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
+   The widget ships **inside the integration** — installing it through HACS is the whole install. There is nothing to copy into `www/` and no dashboard resource to register. Just make sure you restarted Home Assistant after installing (step 8), and hard-refresh the browser (Ctrl/Cmd+Shift+R) the first time so it picks up the card.
+
+   1. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
+   2. Go to your dashboard and add a new manual card
+   3. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
+   4. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
 
 ### Upgrading the dashboard card
 
-If you built your dashboard before v3.5.0, replace your existing ThermIQ card with the current [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) and follow steps 1 and 2 above. Two things changed:
+If you built your dashboard before v3.5.0, replace your existing ThermIQ card with the current [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml). What changed:
+
+- **The widget is installed for you now.** If you followed earlier instructions and copied `thermiq-widget-card.js` and `heatpump_widget.j2` into `www/thermiq/`, you can delete them and remove the `/local/thermiq/thermiq-widget-card.js` resource from *Settings &rarr; Dashboards &rarr; Resources* — the integration serves its own copy. Leaving them registered loads the card twice.
 
 - **The PNG visualization is gone.** The `html-template-card` block that composited `vp_base.png` / `vp_base_hgwon.png` / `vp_base_hw.png` is replaced by the SVG widget, so those three images and the [HTML Jinja2 Template card](https://github.com/PiotrMachowski/Home-Assistant-Lovelace-HTML-Jinja2-Template-card) dependency are no longer needed. You can delete the images from **www/community/**.
 - **The controls point at the new entity domains.** Since v3.3.0 the integration provides `number.*`, `select.*` and `switch.*` entities instead of hijacking `input_number.*`, `input_select.*` and `input_boolean.*`. The old card still referenced the `input_*` names, so its controls stopped working after that upgrade; the current card uses the correct ones.

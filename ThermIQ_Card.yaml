@@ -9,8 +9,8 @@ theme: default
 show_header_toggle: false
 entities:
 ## Animated SVG heat-pump widget.
-## Requires thermiq-widget-card.js + heatpump_widget.j2 in /config/www/thermiq/
-## and the resource registered - see lovelace/README.md
+## Provided by the integration itself, no separate install
+## Shipped with the integration - see lovelace/README.md
   - type: custom:thermiq-widget-card
 ## Runtime statistics (built-in statistics-graph)
   - type: statistics-graph

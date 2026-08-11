@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render lovelace/heatpump_widget.j2 to the static SVG used in the README.
+"""Render the widget template to the static SVG used in the README.
 
 The widget is a Jinja2 template that Home Assistant renders as HTML: an SVG
 schematic plus absolutely positioned HTML badges, a compressor and two pumps,
@@ -31,7 +31,9 @@ import sys
 from jinja2 import Environment
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATE = os.path.join(REPO, "lovelace", "heatpump_widget.j2")
+TEMPLATE = os.path.join(
+    REPO, "custom_components", "thermiq_mqtt", "frontend", "heatpump_widget.j2"
+)
 DEFAULT_SVG = os.path.join(REPO, "docs", "heatpump_widget.svg")
 
 CARD_W, CARD_H = 350, 343
