@@ -13,6 +13,9 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  # Required by claude-code-action@v1 to fetch an OIDC token; without it the
+  # job fails with "Unable to get ACTIONS_ID_TOKEN_REQUEST_URL env variable"
+  id-token: write
 
 jobs:
   claude:
