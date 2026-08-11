@@ -12,51 +12,16 @@ entities:
 ## Requires thermiq-widget-card.js + heatpump_widget.j2 in /config/www/thermiq/
 ## and the resource registered - see lovelace/README.md
   - type: custom:thermiq-widget-card
-## Runtime statistics using apexChart
-  - type: custom:apexcharts-card
-    graph_span: 110 d
-    header:
-      title: Compressor runtime (h/week)
-      show: true
-    yaxis:
-      - decimals: 0
-        apex_config:
-          tickAmount: 3
-        min: 0
-    apex_config:
-      chart:
-        height: 150px
-    hours_12: false
-    span:
-      end: day
-    now:
-      show: false
-    series:
-      - entity: sensor.thermiq_mqtt_vp1_compressor_runtime_h
-        type: column
-        name: Total
-        group_by:
-          func: delta
-          duration: 1w
-        show:
-          legend_value: false
-        statistics:
-          type: mean
-          period: hour
-      - entity: sensor.thermiq_mqtt_vp1_hotwater_runtime_h
-        type: line
-        stroke_width: 1
-        name: Dedicated hotwater
-        group_by:
-          func: delta
-          duration: 1w
-        show:
-          legend_value: false
-        statistics:
-          type: sum
-    show:
-      loading: false  
-
+## Runtime statistics (built-in statistics-graph)
+  - type: statistics-graph
+    title: Compressor runtime (h/week)
+    entities:
+      - sensor.thermiq_mqtt_vp1_compressor_runtime_h
+      - sensor.thermiq_mqtt_vp1_hotwater_runtime_h
+    stat_types: change
+    period: week
+    days_to_show: 110
+    chart_type: bar
   - entity: select.thermiq_mqtt_vp1_main_mode
   - entity: number.thermiq_mqtt_vp1_indoor_requested_t
 # Room sensor only works together with Thermiq-Room ##################################################################
