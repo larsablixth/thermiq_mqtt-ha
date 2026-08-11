@@ -3,7 +3,9 @@
 
 > **This is a maintained fork** of [ThermIQ/thermiq_mqtt-ha](https://github.com/ThermIQ/thermiq_mqtt-ha) with additional bug fixes. It is **not** in the HACS default list, so it must be added as a custom repository — see step 7 below.
 
-![Screenshot](docs/Lovelace1.jpg)
+![The ThermIQ animated heat-pump widget](docs/heatpump_widget.svg)
+
+*The [animated SVG widget](lovelace/README.md): pipe colour tracks temperature all the way round the machine. Shown here as a static render with demo values — in Home Assistant the flows animate and the compressor turns.*
 
 This integration allows you to use the **ThermIQ-MQTT** and **ThermIQ-Room2** hardware interface to control and monitor your Thermia or Danfoss heatpump from Home Assistant. It is actively supported both here and at [Thermiq.net](https://thermiq.net)
 
