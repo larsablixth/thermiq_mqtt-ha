@@ -9,9 +9,13 @@
  *
  * Usage (as an entities-card row or a standalone card):
  *   type: custom:thermiq-widget-card
- *   template_url: /thermiq_mqtt_frontend/heatpump_widget.j2   # default
  *   entity_prefix: thermiq_mqtt_vp1                   # default; set to
  *                          # thermiq_mqtt_<id> if your entry id isn't vp1
+ *
+ * There is also a template_url option, but do not set it. It defaults to the
+ * path the integration serves, and pinning a path in card config means the
+ * card breaks the next time that path changes - which is exactly what
+ * happened when the template moved out of www/ and into the integration.
  *
  * Editing workflow: edit heatpump_widget.j2 next to this file in the
  * integration folder and reload the page. The integration serves this
