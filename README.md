@@ -17,6 +17,7 @@ Get the neccessary hardware from [Thermiq.net](https://thermiq.net), where you a
 From v3.5.0:
    - The PNG-based dashboard visualization is retired. `ThermIQ_Card.yaml` now uses the [animated SVG widget](lovelace/README.md), and the `vp_base*.png` images and the HTML Jinja2 Template card are no longer needed.
    - The card's controls now reference the `number`/`select`/`switch` entities introduced in v3.3.0 instead of the old `input_*` names. See [Upgrading the dashboard card](#upgrading-the-dashboard-card).
+   - Two HACS frontend dependencies dropped: the HTML Jinja2 Template card and Number Box. The card now needs only fold-entity-row and apexcharts-card.
 
 From v3.x:
    - the units used in the db recorder have been corrected, an attempt to upgrade the existing database is done at start. Also try the "Developer Tools" Statistics tab if built in conversions fail
@@ -56,12 +57,11 @@ From v3.x:
 
    1. Copy `heatpump_widget.j2` and `thermiq-widget-card.js` from [lovelace/](lovelace/) to **www/thermiq/** on your Home Assistant machine
    2. Register the card: *Settings &rarr; Dashboards &rarr; &#8942; &rarr; Resources &rarr; Add*, URL `/local/thermiq/thermiq-widget-card.js?v=1.1.0`, type *JavaScript module*
-   3. HACS->Frontend->Explore/Add [Number Box](https://github.com/htmltiger/numberbox-card)
-   4. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
-   5. HACS->Frontend->Explore/Add [apexcharts-card](https://github.com/RomRider/apexcharts-card)
-   6. Go to your dashboard and add a new manual card
-   7. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
-   8. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
+   3. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
+   4. HACS->Frontend->Explore/Add [apexcharts-card](https://github.com/RomRider/apexcharts-card)
+   5. Go to your dashboard and add a new manual card
+   6. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
+   7. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
 
 ### Upgrading the dashboard card
 
@@ -69,8 +69,9 @@ If you built your dashboard before v3.5.0, replace your existing ThermIQ card wi
 
 - **The PNG visualization is gone.** The `html-template-card` block that composited `vp_base.png` / `vp_base_hgwon.png` / `vp_base_hw.png` is replaced by the SVG widget, so those three images and the [HTML Jinja2 Template card](https://github.com/PiotrMachowski/Home-Assistant-Lovelace-HTML-Jinja2-Template-card) dependency are no longer needed. You can delete the images from **www/community/**.
 - **The controls point at the new entity domains.** Since v3.3.0 the integration provides `number.*`, `select.*` and `switch.*` entities instead of hijacking `input_number.*`, `input_select.*` and `input_boolean.*`. The old card still referenced the `input_*` names, so its controls stopped working after that upgrade; the current card uses the correct ones.
+- **[Number Box](https://github.com/htmltiger/numberbox-card) is no longer needed.** The integration's `number` entities already present as input boxes, so the card uses plain rows and you can remove that HACS frontend card if nothing else on your dashboard uses it.
 
-Your own helper entities for energy control (`input_number.vp1_electricity_price_threshold` and friends) are unaffected — they are still `input_*`, because you create them yourself.
+Your own helper entities for energy control (`input_number.vp1_electricity_price_threshold` and friends) are unaffected — they are still `input_*`, because you create them yourself. Set their *Display mode* to **Box** when creating them if you want them to look like the rest of the card; helpers created as sliders will render as sliders.
   
 ### Debugging
 

@@ -58,11 +58,9 @@ entities:
       loading: false  
 
   - entity: select.thermiq_mqtt_vp1_main_mode
-  - type: custom:numberbox-card
-    entity: number.thermiq_mqtt_vp1_indoor_requested_t
+  - entity: number.thermiq_mqtt_vp1_indoor_requested_t
 # Room sensor only works together with Thermiq-Room ##################################################################
-  - type: custom:numberbox-card
-    entity: number.thermiq_mqtt_vp1_room_sensor_set_t
+  - entity: number.thermiq_mqtt_vp1_room_sensor_set_t
   - entity: switch.thermiq_mqtt_vp1_heatpump_evu_block
 # Energy management only works with Thermiq-Room2 and AIO Energy Management HACS plugin ##################################################################
   - type: custom:fold-entity-row
@@ -72,11 +70,8 @@ entities:
     entities: 
       - entity: input_boolean.vp1_enable_energy_control
       - entity: input_number.vp1_electricity_price_threshold
-        type: custom:numberbox-card
       - entity: input_number.vp1_electricity_low_hours
-        type: custom:numberbox-card
       - entity: input_number.vp1_powerconsumption_max
-        type: custom:numberbox-card
       - entity: input_boolean.vp1_force_evu
 # ThermIQ Heatpump control ##################################################################
   - type: custom:fold-entity-row
@@ -117,94 +112,60 @@ entities:
           type: section
           label: Heater settings (A1)
         entities:
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_indoor_requested_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_curve_slope
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_curve_min
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_curve_max
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_curve_p5
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_curve_0
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_curve_n5
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_heating_stop_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_reduction_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_room_factor
+          - entity: number.thermiq_mqtt_vp1_indoor_requested_t
+          - entity: number.thermiq_mqtt_vp1_integral1_curve_slope
+          - entity: number.thermiq_mqtt_vp1_integral1_curve_min
+          - entity: number.thermiq_mqtt_vp1_integral1_curve_max
+          - entity: number.thermiq_mqtt_vp1_integral1_curve_p5
+          - entity: number.thermiq_mqtt_vp1_integral1_curve_0
+          - entity: number.thermiq_mqtt_vp1_integral1_curve_n5
+          - entity: number.thermiq_mqtt_vp1_heating_stop_t
+          - entity: number.thermiq_mqtt_vp1_reduction_t
+          - entity: number.thermiq_mqtt_vp1_room_factor
       - type: custom:fold-entity-row
         head:
           type: section
           label: Hot-water settings
         entities:
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_hotwater_start_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_hotwater_runtime_m
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_heatpump_runtime_m
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_legionella_interval_d
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_legionella_stop_t
+          - entity: number.thermiq_mqtt_vp1_hotwater_start_t
+          - entity: number.thermiq_mqtt_vp1_hotwater_runtime_m
+          - entity: number.thermiq_mqtt_vp1_heatpump_runtime_m
+          - entity: number.thermiq_mqtt_vp1_legionella_interval_d
+          - entity: number.thermiq_mqtt_vp1_legionella_stop_t
       - type: custom:fold-entity-row
         head:
           type: section
           label: Curve 2 (A2)
         entities:
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_curve_slope
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_curve_min
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_curve_max
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_curve_target
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_curve_actual
+          - entity: number.thermiq_mqtt_vp1_integral2_curve_slope
+          - entity: number.thermiq_mqtt_vp1_integral2_curve_min
+          - entity: number.thermiq_mqtt_vp1_integral2_curve_max
+          - entity: number.thermiq_mqtt_vp1_integral2_curve_target
+          - entity: number.thermiq_mqtt_vp1_integral2_curve_actual
       - type: custom:fold-entity-row
         head:
           type: section
           label: Heater limits 
         entities:
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_a_limit
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral1_hysteresis_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_returnline_max_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_start_interval_min_m
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_brine_min_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_pressure_pipe_limit_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_outdoor_stop_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_cooling_target_t
+          - entity: number.thermiq_mqtt_vp1_integral1_a_limit
+          - entity: number.thermiq_mqtt_vp1_integral1_hysteresis_t
+          - entity: number.thermiq_mqtt_vp1_returnline_max_t
+          - entity: number.thermiq_mqtt_vp1_start_interval_min_m
+          - entity: number.thermiq_mqtt_vp1_brine_min_t
+          - entity: number.thermiq_mqtt_vp1_pressure_pipe_limit_t
+          - entity: number.thermiq_mqtt_vp1_outdoor_stop_t
+          - entity: number.thermiq_mqtt_vp1_cooling_target_t
       - type: custom:fold-entity-row
         head:
           type: section
           label: Curve 2 limits
         entities:
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_a_limit
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_integral2_hysteresis_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_elect_boiler_steps_max
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_current_consumption_max_a
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_shunt_time_s
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_hotwater_stop_t
+          - entity: number.thermiq_mqtt_vp1_integral2_a_limit
+          - entity: number.thermiq_mqtt_vp1_integral2_hysteresis_t
+          - entity: number.thermiq_mqtt_vp1_elect_boiler_steps_max
+          - entity: number.thermiq_mqtt_vp1_current_consumption_max_a
+          - entity: number.thermiq_mqtt_vp1_shunt_time_s
+          - entity: number.thermiq_mqtt_vp1_hotwater_stop_t
       - type: custom:fold-entity-row
         head:
           type: section
@@ -214,27 +175,15 @@ entities:
           - entity: sensor.thermiq_mqtt_vp1_manual_test_mode_on
           - entity: sensor.thermiq_mqtt_vp1_factory_reset_req
           - entity: sensor.thermiq_mqtt_vp1_runtime_counters_reset_req
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_outdoor_sensor_offset_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_supplyline_sensor_offset_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_returnline_sensor_offset_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_boiler_sensor_offset_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_brine_in_sensor_offset_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_brine_out_sensor_offset_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_heatingsystem_type
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_internal_logging_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_brine_runout_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_brine_run_in_t
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_legionella_run_on
-          - type: custom:numberbox-card
-            entity: number.thermiq_mqtt_vp1_legionella_run_length_h
+          - entity: number.thermiq_mqtt_vp1_outdoor_sensor_offset_t
+          - entity: number.thermiq_mqtt_vp1_supplyline_sensor_offset_t
+          - entity: number.thermiq_mqtt_vp1_returnline_sensor_offset_t
+          - entity: number.thermiq_mqtt_vp1_boiler_sensor_offset_t
+          - entity: number.thermiq_mqtt_vp1_brine_in_sensor_offset_t
+          - entity: number.thermiq_mqtt_vp1_brine_out_sensor_offset_t
+          - entity: number.thermiq_mqtt_vp1_heatingsystem_type
+          - entity: number.thermiq_mqtt_vp1_internal_logging_t
+          - entity: number.thermiq_mqtt_vp1_brine_runout_t
+          - entity: number.thermiq_mqtt_vp1_brine_run_in_t
+          - entity: number.thermiq_mqtt_vp1_legionella_run_on
+          - entity: number.thermiq_mqtt_vp1_legionella_run_length_h
