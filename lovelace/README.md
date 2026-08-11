@@ -39,10 +39,33 @@ so animations run uninterrupted. It has no dependencies.
 
 1. Copy `heatpump_widget.j2` and `thermiq-widget-card.js` to
    `/config/www/thermiq/` on your Home Assistant machine.
+
+   > **If you did not already have a `www` folder, restart Home Assistant
+   > now.** Home Assistant maps `/config/www/` to the `/local/` URL only when
+   > it starts, so on a fresh install — the HA OS image included — files put
+   > into a newly created `www` folder return 404 until you restart. This is
+   > the most common reason the card comes up blank.
+
 2. Register the card: *Settings → Dashboards → ⋮ → Resources → Add*,
    URL `/local/thermiq/thermiq-widget-card.js?v=1.1.0`, type
    *JavaScript module*. (Bump the `?v=` whenever you update the JS.)
-3. Add the card to a dashboard — standalone or as a row inside an
+
+   If your dashboards are in YAML mode the Resources page is hidden, and the
+   resource goes in `configuration.yaml` instead:
+
+   ```yaml
+   lovelace:
+     mode: yaml
+     resources:
+       - url: /local/thermiq/thermiq-widget-card.js?v=1.1.0
+         type: module
+   ```
+
+3. Reload the browser with a hard refresh (Ctrl/Cmd+Shift+R). A newly
+   registered resource is often not picked up until the cached page is
+   dropped.
+
+4. Add the card to a dashboard — standalone or as a row inside an
    `entities` card:
 
    ```yaml
@@ -59,6 +82,31 @@ so animations run uninterrupted. It has no dependencies.
 Editing the visualization is just editing `heatpump_widget.j2` and
 reloading the page — the card fetches the template fresh on each page
 load.
+
+### If it doesn't come up
+
+Work through these in order — the first two catch almost everything.
+
+1. **Is the template served?** Open
+   `http://<your-ha>:8123/local/thermiq/heatpump_widget.j2` in a browser. You
+   should get a wall of SVG markup. A 404 means the files are not where Home
+   Assistant is looking: check they are in `/config/www/thermiq/` (not
+   `/config/thermiq/`, and not `www/community/`), and that you restarted after
+   creating the `www` folder.
+2. **Is the card resource loaded?** If the card row shows *"Custom element
+   doesn't exist: thermiq-widget-card"*, the JS was not loaded — re-check the
+   resource URL and hard-refresh. The browser console will show a 404 for the
+   `.js` if the path is wrong.
+3. **Card loads but shows an error box.** The card prints
+   `cannot load /local/thermiq/heatpump_widget.j2` inside the card when the
+   template fetch fails, which points back at step 1.
+4. **Card draws but values are blank or the pump looks idle.** The template
+   reads `sensor.thermiq_mqtt_vp1_*`. If your integration entry ID isn't
+   `vp1`, set `entity_prefix` on the card as shown above; the widget cannot
+   guess it.
+
+`/config` is reachable over the Samba, SSH or File editor add-ons on the HA OS
+image.
 
 ## Optional extras
 
