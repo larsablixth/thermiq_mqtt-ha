@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="600" viewBox="0 0 430 600" role="img" aria-labelledby="t d">
+  <title id="t">ThermIQ-MQTT config dialog</title>
+  <desc id="d">Schematic of the Heatpump config flow: Unique ID, MQTT Nodename, Language, and three checkboxes for hexformat, MQTT debug and recorder migration.</desc>
+
+  <style>
+    .card  { fill: #ffffff; stroke: #e3e5e8; stroke-width: 1; }
+    .title { font: 500 18px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #212121; }
+    .desc  { font: 400 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5f6368; }
+    .lbl   { font: 400 11px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #5f6368; }
+    .val   { font: 400 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #212121; }
+    .cb    { font: 400 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #212121; }
+    .btn   { font: 500 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #03a9f4; letter-spacing: .4px; }
+    .icon  { fill: none; stroke: #5f6368; stroke-width: 1.6; stroke-linecap: round; }
+    .field { fill: #f4f5f7; }
+    .under { stroke: #8b8f94; stroke-width: 1; }
+    .box   { fill: #ffffff; stroke: #6b7075; stroke-width: 1.5; }
+  </style>
+
+  <rect x="8" y="8" width="414" height="584" rx="10" class="card"/>
+
+  <!-- header -->
+  <text x="30" y="47" class="title">Heatpump config</text>
+  <circle cx="368" cy="41" r="8.5" class="icon"/>
+  <text x="368" y="45.5" text-anchor="middle" class="lbl" style="font-size:11px;fill:#5f6368">?</text>
+  <path d="M392 35 l12 12 M404 35 l-12 12" class="icon"/>
+
+  <text x="30" y="76" class="desc">Set up a new ThermIQ_MQTT Instance</text>
+
+  <!-- 1. Unique ID -->
+  <rect x="30" y="92" width="370" height="52" rx="4" class="field"/>
+  <line x1="30" y1="144" x2="400" y2="144" class="under"/>
+  <text x="42" y="112" class="lbl">Unique ID *</text>
+  <text x="42" y="133" class="val">vp1</text>
+
+  <!-- 2. MQTT Nodename -->
+  <rect x="30" y="156" width="370" height="52" rx="4" class="field"/>
+  <line x1="30" y1="208" x2="400" y2="208" class="under"/>
+  <text x="42" y="176" class="lbl">MQTT Nodename *</text>
+  <text x="42" y="197" class="val">ThermIQ/ThermIQ-mqtt</text>
+
+  <!-- 3. Language (dropdown) -->
+  <rect x="30" y="220" width="370" height="52" rx="4" class="field"/>
+  <line x1="30" y1="272" x2="400" y2="272" class="under"/>
+  <text x="42" y="240" class="lbl">Language *</text>
+  <text x="42" y="261" class="val">en</text>
+  <path d="M374 249 l7 8 l7 -8" class="icon"/>
+
+  <!-- 4. hexformat -->
+  <rect x="31" y="300" width="17" height="17" rx="2.5" class="box"/>
+  <text x="60" y="313" class="cb">Use hexformat for registers in MQTT</text>
+
+  <!-- 5. debug -->
+  <rect x="31" y="340" width="17" height="17" rx="2.5" class="box"/>
+  <text x="60" y="353" class="cb">Enable MQTT debug by adding '_dbg' to</text>
+  <text x="60" y="371" class="cb">Nodename</text>
+
+  <!-- 6. migrate_data -->
+  <rect x="31" y="398" width="17" height="17" rx="2.5" class="box"/>
+  <text x="60" y="411" class="cb">Request migration of old data in recorder</text>
+  <text x="60" y="429" class="cb">database (may take time)</text>
+
+  <text x="400" y="560" text-anchor="end" class="btn">SUBMIT</text>
+</svg>
