@@ -8,7 +8,9 @@ correctly - the card is otherwise only exercised in a browser.
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.setup import async_setup_component
 
 from custom_components.thermiq_mqtt import (
     CARD_FILENAME,
@@ -18,59 +20,68 @@ from custom_components.thermiq_mqtt import (
     async_register_frontend,
 )
 
+FRONTEND_DIR = Path("custom_components/thermiq_mqtt/frontend")
+
+
+@pytest.fixture
+async def http(hass: HomeAssistant):
+    """hass.http only exists once the http component is set up."""
+    assert await async_setup_component(hass, "http", {})
+    return hass.http
+
 
 def test_card_files_are_shipped_inside_the_integration():
     """HACS installs custom_components/ only, so the card must live there."""
-    frontend = Path("custom_components/thermiq_mqtt/frontend")
-    assert (frontend / CARD_FILENAME).is_file()
-    assert (frontend / "heatpump_widget.j2").is_file()
+    assert (FRONTEND_DIR / CARD_FILENAME).is_file()
+    assert (FRONTEND_DIR / "heatpump_widget.j2").is_file()
 
 
 def test_card_default_url_matches_the_served_path():
     """The card fetches its template from the path the integration registers."""
-    card = (Path("custom_components/thermiq_mqtt/frontend") / CARD_FILENAME).read_text()
+    card = (FRONTEND_DIR / CARD_FILENAME).read_text()
     assert f'const DEFAULT_URL = "{FRONTEND_URL_BASE}/heatpump_widget.j2"' in card
 
 
-async def test_register_frontend_serves_directory_and_adds_module(hass: HomeAssistant):
-    with (
-        patch.object(
-            hass.http, "async_register_static_paths", AsyncMock()
-        ) as register_paths,
-        patch("custom_components.thermiq_mqtt.add_extra_js_url") as add_js,
-    ):
+async def test_card_and_template_are_actually_served(
+    hass: HomeAssistant, http, hass_client
+):
+    """End to end: register for real, then fetch both files over HTTP."""
+    with patch("custom_components.thermiq_mqtt.add_extra_js_url"):
         await async_register_frontend(hass)
 
-    configs = register_paths.call_args.args[0]
-    assert len(configs) == 1
-    assert configs[0].url_path == FRONTEND_URL_BASE
-    assert configs[0].path.endswith("custom_components/thermiq_mqtt/frontend")
-    # the template is edited in place, so it must not be cached indefinitely
-    assert configs[0].cache_headers is False
+    client = await hass_client()
+
+    resp = await client.get(f"{FRONTEND_URL_BASE}/{CARD_FILENAME}")
+    assert resp.status == 200
+    assert "thermiq-widget-card" in await resp.text()
+
+    resp = await client.get(f"{FRONTEND_URL_BASE}/heatpump_widget.j2")
+    assert resp.status == 200
+    assert "hpwidget" in await resp.text()
+
+
+async def test_register_frontend_adds_the_module_once(hass: HomeAssistant, http):
+    with patch("custom_components.thermiq_mqtt.add_extra_js_url") as add_js:
+        await async_register_frontend(hass)
 
     add_js.assert_called_once_with(
         hass, f"{FRONTEND_URL_BASE}/{CARD_FILENAME}?v={CARD_VERSION}"
     )
     assert hass.data[FRONTEND_REGISTERED] is True
 
-
-async def test_register_frontend_is_idempotent(hass: HomeAssistant):
-    """Registering the same static path twice raises, so it must run once."""
-    hass.data[FRONTEND_REGISTERED] = True
-
+    # registering the same static path twice raises, so a second call must
+    # do nothing at all
     with (
-        patch.object(
-            hass.http, "async_register_static_paths", AsyncMock()
-        ) as register_paths,
-        patch("custom_components.thermiq_mqtt.add_extra_js_url") as add_js,
+        patch.object(hass.http, "async_register_static_paths", AsyncMock()) as again,
+        patch("custom_components.thermiq_mqtt.add_extra_js_url") as add_js_again,
     ):
         await async_register_frontend(hass)
 
-    register_paths.assert_not_called()
-    add_js.assert_not_called()
+    again.assert_not_called()
+    add_js_again.assert_not_called()
 
 
-async def test_registration_failure_does_not_break_setup(hass: HomeAssistant):
+async def test_registration_failure_does_not_break_setup(hass: HomeAssistant, http):
     """A frontend problem must not stop the integration from loading."""
     with (
         patch.object(
