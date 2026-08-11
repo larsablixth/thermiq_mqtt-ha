@@ -4,7 +4,7 @@
 DOMAIN = "thermiq_mqtt"
 MANUFACTURER = "ThermIQ.net"
 DEVVERSION = "1.1"
-DATABASE_VERSION = 1.5
+DATABASE_VERSION = 1.6
 
 
 # Database version, used to migrate old versions of data in the recorded history.
