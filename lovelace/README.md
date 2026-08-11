@@ -34,11 +34,17 @@ so animations run uninterrupted. It has no dependencies.
 
 ## Install
 
-1. Copy `heatpump_widget.j2` and `thermiq-widget-card.js` to
-   `/config/www/thermiq/` on your Home Assistant machine.
-2. Register the card: *Settings → Dashboards → ⋮ → Resources → Add*,
-   URL `/local/thermiq/thermiq-widget-card.js?v=1.1.0`, type
-   *JavaScript module*. (Bump the `?v=` whenever you update the JS.)
+**Nothing to install.** The card ships inside the integration, which serves it
+at `/thermiq_mqtt_frontend/` and registers it with the frontend during setup —
+no files to copy into `www/`, and no dashboard resource to add by hand.
+
+1. Restart Home Assistant after installing the integration, if you haven't
+   already. The card is registered during setup, so it doesn't exist until the
+   integration has loaded once.
+
+2. Hard-refresh the browser (Ctrl/Cmd+Shift+R) the first time, so it picks up
+   the newly registered module instead of a cached page.
+
 3. Add the card to a dashboard — standalone or as a row inside an
    `entities` card:
 
@@ -53,9 +59,33 @@ so animations run uninterrupted. It has no dependencies.
    entity_prefix: thermiq_mqtt_myid
    ```
 
-Editing the visualization is just editing `heatpump_widget.j2` and
-reloading the page — the card fetches the template fresh on each page
-load.
+Editing the visualization means editing
+`custom_components/thermiq_mqtt/frontend/heatpump_widget.j2` and reloading the
+page — the card fetches the template fresh on each page load, and it is served
+with caching disabled so edits show up immediately.
+
+### If it doesn't come up
+
+1. **Has the integration loaded?** The card is registered during setup, so it
+   does not exist until Home Assistant has started with the integration
+   installed. Check the log for `Could not register the ThermIQ dashboard card`.
+2. **Is the card served?** Open
+   `http://<your-ha>:8123/thermiq_mqtt_frontend/thermiq-widget-card.js` in a
+   browser. You should get JavaScript; a 404 means the static path was not
+   registered, and the log line above will say why.
+3. **Custom element doesn't exist: thermiq-widget-card.** The browser did not
+   load the module — hard-refresh, and check the console for a failed request.
+4. **Card loads but shows an error box.** The card prints
+   `cannot load /thermiq_mqtt_frontend/heatpump_widget.j2` inside itself when
+   the template fetch fails, which points back at step 2.
+5. **Card draws but values are blank.** The template reads
+   `sensor.thermiq_mqtt_vp1_*`; set `entity_prefix` if your entry ID isn't
+   `vp1`.
+
+**Upgrading from a manual install.** If you previously copied the files into
+`www/thermiq/` and registered `/local/thermiq/thermiq-widget-card.js` as a
+resource, remove that resource and delete the copies, or the card is loaded
+twice from two different versions.
 
 ## Optional extras
 
