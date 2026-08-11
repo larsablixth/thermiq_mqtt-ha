@@ -5,13 +5,16 @@ on:
     branches:
       - master
       - dev
+  # Also run on pull requests, so problems are visible before a merge rather
+  # than after it
+  pull_request:
 
 jobs:
   validate:
     runs-on: "ubuntu-latest"
     name: Validate
     steps:
-        - uses: "actions/checkout@v2"
+        - uses: "actions/checkout@v4"
         - name: HACS validation
           uses: "hacs/action@main"
           with:
@@ -25,11 +28,27 @@ jobs:
     runs-on: "ubuntu-latest"
     name: Check style formatting
     steps:
-        - uses: "actions/checkout@v2"
-        - uses: "actions/setup-python@v1"
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
           with:
-            python-version: "3.x"
-        - run: python3 -m pip install black
-        - run: black .
+            python-version: "3.12"
+        # pinned so a new black release cannot turn CI red on its own
+        - run: python3 -m pip install black==25.11.0
+        # only the tests this PR adds - reformatting the whole
+        # codebase would be a large unrelated diff
+        - run: black --check tests/
 
-  
+  test:
+    runs-on: "ubuntu-latest"
+    name: Run tests
+    steps:
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
+          with:
+            python-version: "3.13"
+        - name: Install dependencies
+          run: |
+            python3 -m pip install --upgrade pip
+            python3 -m pip install -r requirements_test.txt
+        - name: Run tests
+          run: python3 -m pytest tests/ -v
