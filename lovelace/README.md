@@ -7,6 +7,8 @@ The whole machine is drawn as one SVG: cabinet, brine loop, evaporator,
 scroll compressor, condenser, hot-water tank, 3-way valve, radiator
 circuit and (optionally) a pool/secondary shunt circuit.
 
+![The widget rendered with demo values](../docs/heatpump_widget.svg)
+
 Everything on screen tells the truth about the machine:
 
 - **Color is temperature, everywhere.** Every pipe, badge and vessel is
