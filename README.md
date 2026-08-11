@@ -14,6 +14,10 @@ Get the neccessary hardware from [Thermiq.net](https://thermiq.net), where you a
 
 
 ## Important release notes
+From v3.5.0:
+   - The PNG-based dashboard visualization is retired. `ThermIQ_Card.yaml` now uses the [animated SVG widget](lovelace/README.md), and the `vp_base*.png` images and the HTML Jinja2 Template card are no longer needed.
+   - The card's controls now reference the `number`/`select`/`switch` entities introduced in v3.3.0 instead of the old `input_*` names. See [Upgrading the dashboard card](#upgrading-the-dashboard-card).
+
 From v3.x:
    - the units used in the db recorder have been corrected, an attempt to upgrade the existing database is done at start. Also try the "Developer Tools" Statistics tab if built in conversions fail
    - The EVU is now a boolean value better representing the ON/OFF function
@@ -48,17 +52,25 @@ From v3.x:
    7. **Request migration of old data in recorder database** &mdash; only needed when upgrading from an older version whose recorded units or entity ids differ. It rewrites history in the recorder database and may take a long time on a large database. Leave it **off** for a fresh install.
 10. To control and monitor the heatpump from your dashboard:
 
-   *Alternative:* an [animated SVG widget](lovelace/README.md) (live temperatures as pipe colors, flow arrows, scroll-compressor animation) is available in the [lovelace/](lovelace/) folder — it replaces steps 1, 5 and 6 below and needs no HACS frontend dependencies for the visualization itself.
+   The visualization is the [animated SVG widget](lovelace/README.md) — live temperatures as pipe colours, flow arrows that appear only when the medium actually moves, and an orbiting scroll compressor. It replaced the old PNG-based picture in v3.5.0; see [Upgrading the dashboard card](#upgrading-the-dashboard-card) if you are coming from an earlier version.
 
-   1. HACS->Frontend->Explore/Add [HTML Jinja2 Template card](https://github.com/PiotrMachowski/Home-Assistant-Lovelace-HTML-Jinja2-Template-card)
-   2. HACS->Frontend->Explore/Add [Number Box](https://github.com/htmltiger/numberbox-card)
-   3. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
-   4. HACS->Frontend->Explore/Add [apexcharts-card](https://github.com/RomRider/apexcharts-card)
-   5. Download/save the images [vp_base.png](vp_base.png), [vp_base_hgwon.png](vp_base_hgwon.png) and [vp_base_hw.png](vp_base_hw.png)
-   6. Upload the downloaded files to your Home Assistant machine to either the folder **www/community/** or (**local/community/**)
-   7. Go to your dashboard and add a new manual card
-   8. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
-   9. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
+   1. Copy `heatpump_widget.j2` and `thermiq-widget-card.js` from [lovelace/](lovelace/) to **www/thermiq/** on your Home Assistant machine
+   2. Register the card: *Settings &rarr; Dashboards &rarr; &#8942; &rarr; Resources &rarr; Add*, URL `/local/thermiq/thermiq-widget-card.js?v=1.1.0`, type *JavaScript module*
+   3. HACS->Frontend->Explore/Add [Number Box](https://github.com/htmltiger/numberbox-card)
+   4. HACS->Frontend->Explore/Add [fold-entity-row](https://github.com/thomasloven/lovelace-fold-entity-row)
+   5. HACS->Frontend->Explore/Add [apexcharts-card](https://github.com/RomRider/apexcharts-card)
+   6. Go to your dashboard and add a new manual card
+   7. Copy/paste the contents of [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) into your manual card
+   8. Before you save the card, adjust the ID if you've used anything else than the default **vp1** when setting up the integration. [hint: Ctrl+F with find/replace is your friend]
+
+### Upgrading the dashboard card
+
+If you built your dashboard before v3.5.0, replace your existing ThermIQ card with the current [ThermIQ_Card.yaml](https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/ThermIQ_Card.yaml) and follow steps 1 and 2 above. Two things changed:
+
+- **The PNG visualization is gone.** The `html-template-card` block that composited `vp_base.png` / `vp_base_hgwon.png` / `vp_base_hw.png` is replaced by the SVG widget, so those three images and the [HTML Jinja2 Template card](https://github.com/PiotrMachowski/Home-Assistant-Lovelace-HTML-Jinja2-Template-card) dependency are no longer needed. You can delete the images from **www/community/**.
+- **The controls point at the new entity domains.** Since v3.3.0 the integration provides `number.*`, `select.*` and `switch.*` entities instead of hijacking `input_number.*`, `input_select.*` and `input_boolean.*`. The old card still referenced the `input_*` names, so its controls stopped working after that upgrade; the current card uses the correct ones.
+
+Your own helper entities for energy control (`input_number.vp1_electricity_price_threshold` and friends) are unaffected — they are still `input_*`, because you create them yourself.
   
 ### Debugging
 
@@ -67,8 +79,6 @@ Use [MQTT Explorer](https://mqtt-explorer.com/) to ensure your heat pump is comm
 Home Assistant server sometimes needs to be restarted once all configuration is done
 
 Make sure you use the right MQTT Nodename when configuring the HA Integration. The MQTT-Nodename is the same as the base **"Topic"** in MQTT-Explorer (without /data)
-
-From v2.3.0 the pictures used has changed from *.jpg to *.png format to facilitate dark mode. You might want to update the dashboard-card
 
   
 # ThermIQ Energy Control for **ThermIQ-Room2**
@@ -186,10 +196,10 @@ aio_energy_management:
 
 # Misc
 #### Automations
-No setup of automations is needed. You can use the normal "input_number" services to change a value in the heatpump. For example:
+No setup of automations is needed. You can use the normal `number` services to change a value in the heatpump. For example:
 
-```service: input_number.set_value
-data: {"entity_id": "input_number.thermiq_mqtt_vp1_indoor_requested_t", "value":20}
+```service: number.set_value
+data: {"entity_id": "number.thermiq_mqtt_vp1_indoor_requested_t", "value":20}
 ```
 
 #### Available data

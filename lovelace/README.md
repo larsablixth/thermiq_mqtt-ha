@@ -1,7 +1,8 @@
 # Animated heat-pump widget
 
-A live SVG schematic of the heat pump as a Lovelace card — a drop-in
-replacement for the PNG-based visualization in `ThermIQ_Card.yaml`.
+A live SVG schematic of the heat pump as a Lovelace card. Since v3.5.0 this
+is the visualization used by `ThermIQ_Card.yaml`, replacing the PNG-based
+picture that came before it.
 
 The whole machine is drawn as one SVG: cabinet, brine loop, evaporator,
 scroll compressor, condenser, hot-water tank, 3-way valve, radiator
@@ -89,9 +90,9 @@ it off. Without the helper, demo mode is simply off.
 
 ## Compatibility note
 
-The widget reads the integration's sensors and binary sensors, which
-exist on current master. Two references assume the native
-`number`/`switch` platforms proposed in PR #76 (`number.…_integral2_curve_target`
-for the pool-target color and `switch.…_heatpump_evu_block` for the EVU
-badge); on current master those two gracefully fall back to defaults and
-everything else works unchanged.
+The widget reads the integration's sensors and binary sensors, plus
+`number.…_integral2_curve_target` for the pool-target colour and
+`switch.…_heatpump_evu_block` for the EVU badge. All of these exist on this
+fork. Against **upstream** ThermIQ, which still uses the `input_*` platforms,
+those two references fall back to defaults and everything else works
+unchanged.
