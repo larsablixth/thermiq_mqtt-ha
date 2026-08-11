@@ -7,6 +7,7 @@ from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
     BinarySensorEntity,
 )
 
@@ -28,6 +29,52 @@ from .heatpump.thermiq_regs import (
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# Device classes give each binary sensor its correct semantics in the UI:
+# PROBLEM renders alarms as red "Detected", RUNNING marks pumps and the
+# compressor as active rather than a bare on/off, and CONNECTIVITY marks
+# the installed add-on flags. Backported from upstream ThermIQ/thermiq_mqtt-ha.
+#
+# The shunt direction sensors (shunt1_n/p, shunt2_n/p, shunt_cooling_n/p) are
+# deliberately absent: they indicate travel direction, not a running or fault
+# state, and no HA device class fits them.
+_DEVICE_CLASS_MAP = {
+    # Pumps and compressor
+    "compressor_on": BinarySensorDeviceClass.RUNNING,
+    "brine_pump_on": BinarySensorDeviceClass.RUNNING,
+    "supply_pump_on": BinarySensorDeviceClass.RUNNING,
+    "hotwaterproduction_on": BinarySensorDeviceClass.RUNNING,
+    "active_cooling_on": BinarySensorDeviceClass.RUNNING,
+    "passive_cooling_on": BinarySensorDeviceClass.RUNNING,
+    # Electric heating elements
+    "boiler_3kw_on": BinarySensorDeviceClass.HEAT,
+    "boiler_6kw_on": BinarySensorDeviceClass.HEAT,
+    "aux1_heating_on": BinarySensorDeviceClass.HEAT,
+    "aux2_heating_on": BinarySensorDeviceClass.HEAT,
+    # Alarms
+    "alarm_indication_on": BinarySensorDeviceClass.PROBLEM,
+    "highpressure_alm": BinarySensorDeviceClass.PROBLEM,
+    "lowpressure_alm": BinarySensorDeviceClass.PROBLEM,
+    "motorbreaker_alm": BinarySensorDeviceClass.PROBLEM,
+    "brine_flow_alm": BinarySensorDeviceClass.PROBLEM,
+    "brine_temperature_alm": BinarySensorDeviceClass.PROBLEM,
+    "outdoor_sensor_alm": BinarySensorDeviceClass.PROBLEM,
+    "supplyline_sensor_alm": BinarySensorDeviceClass.PROBLEM,
+    "returnline_sensor_alm": BinarySensorDeviceClass.PROBLEM,
+    "boiler_sensor_alm": BinarySensorDeviceClass.PROBLEM,
+    "indoor_sensor_alm": BinarySensorDeviceClass.PROBLEM,
+    "phase_order_alm": BinarySensorDeviceClass.PROBLEM,
+    "overheating_alm": BinarySensorDeviceClass.PROBLEM,
+    # Installed add-ons
+    "opt_phasemeassure_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_2_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_hgw_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_4_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_5_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_6_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_optimum_installed": BinarySensorDeviceClass.CONNECTIVITY,
+    "opt_flowguard_installed": BinarySensorDeviceClass.CONNECTIVITY,
+}
 
 
 async def async_setup_entry(
@@ -109,6 +156,7 @@ class HeatPumpBinarySensor(BinarySensorEntity):
         self._icon = "mdi:flash-outline"
 
         self._idx = device_id
+        self._attr_device_class = _DEVICE_CLASS_MAP.get(device_id)
         self._vp_reg = vp_reg
         self._bitmask = bitmask
         # Sort key: register number (hex string like 'r10') then bitmask
