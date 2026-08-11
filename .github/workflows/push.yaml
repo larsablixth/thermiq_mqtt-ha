@@ -5,13 +5,16 @@ on:
     branches:
       - master
       - dev
+  # Also validate pull requests: without this, HACS validation, hassfest and
+  # black --check only ran after a branch was already merged into master
+  pull_request:
 
 jobs:
   validate:
     runs-on: "ubuntu-latest"
     name: Validate
     steps:
-        - uses: "actions/checkout@v2"
+        - uses: "actions/checkout@v4"
         - name: HACS validation
           uses: "hacs/action@main"
           with:
@@ -25,11 +28,24 @@ jobs:
     runs-on: "ubuntu-latest"
     name: Check style formatting
     steps:
-        - uses: "actions/checkout@v2"
-        - uses: "actions/setup-python@v1"
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
           with:
             python-version: "3.x"
-        - run: python3 -m pip install black
-        - run: black .
+        # Single source of truth for the black pin: requirements_test.txt
+        - run: python3 -m pip install "$(grep '^black==' requirements_test.txt)"
+        - run: black --check .
 
-  
+  test:
+    runs-on: "ubuntu-latest"
+    name: Run tests
+    steps:
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
+          with:
+            python-version: "3.14"
+        - run: python3 -m pip install -r requirements_test.txt
+        - run: python3 -m pytest tests -v
+        - name: Type check
+          run: python3 -m mypy
+
