@@ -225,18 +225,27 @@ class ThermiqWidgetCard extends HTMLElement {
   }
 }
 
-customElements.define("thermiq-widget-card", ThermiqWidgetCard);
+// Defining a name twice throws, and the throw aborts the rest of this module.
+// Two evaluations are possible whenever the browser sees two distinct URLs for
+// this file - a stale ?v= alongside a fresh one, or the same card delivered
+// both as an extra JS module and as a Lovelace resource - and the module map
+// keys on the full URL, so each is fetched and run separately. Losing the
+// second race silently is fine; taking the card down with an uncaught
+// NotSupportedError is not.
+if (!customElements.get("thermiq-widget-card")) {
+  customElements.define("thermiq-widget-card", ThermiqWidgetCard);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "thermiq-widget-card",
-  name: "ThermIQ Widget Card",
-  description:
-    "Animated heat-pump schematic rendered from a Jinja2 template file with flicker-free DOM morphing.",
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: "thermiq-widget-card",
+    name: "ThermIQ Widget Card",
+    description:
+      "Animated heat-pump schematic rendered from a Jinja2 template file with flicker-free DOM morphing.",
+  });
 
-console.info(
-  `%c THERMIQ-WIDGET-CARD %c v${VERSION} `,
-  "color:white;background:#0288d1;font-weight:700;",
-  "color:#0288d1;background:white;font-weight:700;"
-);
+  console.info(
+    `%c THERMIQ-WIDGET-CARD %c v${VERSION} `,
+    "color:white;background:#0288d1;font-weight:700;",
+    "color:#0288d1;background:white;font-weight:700;"
+  );
+}
