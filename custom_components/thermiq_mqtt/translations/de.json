@@ -1,0 +1,45 @@
+{
+  "config": {
+    "flow_title": "ThermIQ MQTT",
+    "abort": {
+      "already_configured": "Der eingegebene ID-Name wird bereits verwendet."
+    },
+    "error": {
+      "invalid_nodename": "Der eingegebene MQTT-Knotenname ist ungültig",
+      "creation_id": "Die eindeutige ID ist nicht eindeutig oder ungültig",
+      "creation_error": "Beim Aktualisieren des Konfigurationsobjekts ist ein Fehler aufgetreten",
+      "invalid_language": "Beim Erstellen des Konfigurationsobjekts ist ein Fehler aufgetreten"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "id_name": "Eindeutige ID",
+          "mqtt_node": "MQTT-Knotenname",
+          "language": "Sprache",
+          "hexformat": "Hexformat für Register in MQTT verwenden",
+          "thermiq_dbg": "MQTT-Debug aktivieren (Schreibvorgänge werden auf dbg-Topic umgeleitet)",
+          "migrate_data": "Migration alter Daten in der Recorder-Datenbank anfordern (kann dauern)"
+        },
+        "title": "Wärmepumpen-Konfiguration",
+        "description": "Eine neue ThermIQ_MQTT-Instanz einrichten"
+      }
+    }
+  },
+  "options": {
+    "abort": {
+      "already_configured": "Der eingegebene ID-Name wird bereits verwendet."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "mqtt_node": "MQTT-Knotenname",
+          "language": "Sprache",
+          "hexformat": "Hexformat für Register in MQTT verwenden",
+          "thermiq_dbg": "MQTT-Debug aktivieren (Schreibvorgänge werden auf dbg-Topic umgeleitet)",
+          "migrate_data": "Migration alter Daten in der Recorder-Datenbank anfordern (kann dauern)"
+        },
+        "title": "Optionen"
+      }
+    }
+  }
+}

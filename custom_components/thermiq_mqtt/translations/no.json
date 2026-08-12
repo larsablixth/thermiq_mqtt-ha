@@ -1,0 +1,45 @@
+{
+  "config": {
+    "flow_title": "ThermIQ MQTT",
+    "abort": {
+      "already_configured": "Det angitte ID-navnet er allerede i bruk."
+    },
+    "error": {
+      "invalid_nodename": "Det angitte MQTT-nodenavnet er ugyldig",
+      "creation_id": "Den unike ID-en er ikke unik eller ugyldig",
+      "creation_error": "Det oppstod en feil under oppdatering av konfigurasjonsobjektet",
+      "invalid_language": "Det oppstod en feil under oppretting av konfigurasjonsobjektet"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "id_name": "Unik ID",
+          "mqtt_node": "MQTT-nodenavn",
+          "language": "Språk",
+          "hexformat": "Bruk hexformat for registre i MQTT",
+          "thermiq_dbg": "Aktiver MQTT-feilsøking (skrivinger omdirigeres til dbg-emne)",
+          "migrate_data": "Be om migrering av gamle data i recorder-databasen (kan ta tid)"
+        },
+        "title": "Varmepumpekonfigurasjon",
+        "description": "Sett opp en ny ThermIQ_MQTT-instans"
+      }
+    }
+  },
+  "options": {
+    "abort": {
+      "already_configured": "Det angitte ID-navnet er allerede i bruk."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "mqtt_node": "MQTT-nodenavn",
+          "language": "Språk",
+          "hexformat": "Bruk hexformat for registre i MQTT",
+          "thermiq_dbg": "Aktiver MQTT-feilsøking (skrivinger omdirigeres til dbg-emne)",
+          "migrate_data": "Be om migrering av gamle data i recorder-databasen (kan ta tid)"
+        },
+        "title": "Alternativer"
+      }
+    }
+  }
+}
