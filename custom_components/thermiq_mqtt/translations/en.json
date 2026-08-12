@@ -16,7 +16,7 @@
           "id_name": "Unique ID",
           "mqtt_node": "MQTT Nodename",
           "language": "Language",
-          "hexformat": "Use hexformat for registers i MQTT",
+          "hexformat": "Use hexformat for registers in MQTT",
           "thermiq_dbg": "Enable MQTT debug by adding '_dbg' to Nodename",
           "migrate_data": "Request migration of old data in recorder database (may take time)"
         },
@@ -37,7 +37,7 @@
         "data": {
           "mqtt_node": "MQTT Nodename",
           "language": "Language",
-          "hexformat": "Use hexformat for registers i MQTT",
+          "hexformat": "Use hexformat for registers in MQTT",
           "thermiq_dbg": "Enable MQTT debug by adding '_dbg' to Nodename",
           "migrate_data": "Request migration of old data in recorder database (may take time)"
         },
