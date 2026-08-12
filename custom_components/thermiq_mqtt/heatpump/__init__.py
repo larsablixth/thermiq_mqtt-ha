@@ -154,6 +154,22 @@ class HeatPump:
         else:
             self._hpstate["communication_status"] = "Ok"
 
+        # These three are this integration's own bookkeeping rather than
+        # anything the pump sends, so they count as present the moment a
+        # message is processed at all.
+        received.update(("mqtt_counter", "time_str", "communication_status"))
+
+        # What the pump actually sends is what it can actually do. EVU and the
+        # room-sensor setpoint are the clear cases - a ThermIQ-Room2 echoes
+        # them back in /data, a plain ThermIQ-MQTT never mentions them and
+        # cannot act on them either - but the rule needs no list of models to
+        # apply, and no lookup table to keep current when new interfaces ship.
+        #
+        # Only ever grows. A register that appears in one message and not the
+        # next stays supported, so an intermittently reported capability
+        # cannot make an entity flicker in and out of existence.
+        self._echoed |= received
+
         if "app_info" in json_dict:
             self._hpstate["app_info"] = json_dict["app_info"]
 
@@ -167,6 +183,8 @@ class HeatPump:
         self._hass = hass
         self._entry = entry
         self._hpstate: dict[str, Any] = {}
+        # Register keys this pump has ever sent; see message_received.
+        self._echoed: set[str] = set()
         self._domain = DOMAIN
         self._id: str = entry.data[CONF_ID]
         self._id_reg: dict[str, str] = {}
@@ -205,6 +223,26 @@ class HeatPump:
             (self._hass.loop.time() - self._last_message_time)
             < AVAILABILITY_TIMEOUT.total_seconds()
         )
+
+    def supports(self, register: str) -> bool:
+        """True if this pump has ever sent this register.
+
+        The interfaces differ in what they can drive: EVU is ThermIQ-Room2
+        only, and the room-sensor setpoint needs a Room or a Room2. Offering
+        those controls on hardware that cannot act on them gives the user a
+        switch that publishes, is ignored, and springs back - which reads as a
+        broken integration rather than as unsupported hardware.
+
+        Asking the data rather than the model avoids two traps. The MQTT node
+        name is chosen by the user during setup, so it says nothing about the
+        hardware behind it; and app_info is a name rather than a capability, so
+        it needs a lookup table that goes stale the day a new interface ships.
+        What arrives in /data is what the pump will actually act on.
+
+        Before the first message this returns False for everything, which
+        costs nothing: `available` is False then anyway.
+        """
+        return register in self._echoed
 
     async def _availability_watchdog(self, _now: datetime) -> None:
         """Notify entities when availability changes (e.g. comms lost)."""

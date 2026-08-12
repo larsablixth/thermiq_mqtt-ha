@@ -186,8 +186,12 @@ class HeatPumpBinarySensor(BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Unavailable until the first message and while the pump is silent."""
-        return self._heatpump.available
+        """Unavailable while silent, or if this pump never sends the register.
+
+        See HeatPump.supports. A sensor for a register the hardware does not
+        report has nothing to show but `unknown`, forever.
+        """
+        return self._heatpump.available and self._heatpump.supports(self._vp_reg)
 
     @property
     def vp_reg(self) -> str:
