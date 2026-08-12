@@ -2,10 +2,13 @@
 import logging
 from builtins import property
 from datetime import datetime
+from pathlib import Path
 from sqlalchemy import update, select, delete
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, Event
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STARTED,
     UnitOfTemperature
@@ -46,12 +49,57 @@ PLATFORMS = [
     "binary_sensor",
 ]
 
+# The dashboard widget ships inside the integration, so installing it is the
+# whole install: nothing to copy into www/ and no Lovelace resource to register
+# by hand. Bumping CARD_VERSION busts the browser cache for the card.
+FRONTEND_URL_BASE = f"/{DOMAIN}_frontend"
+CARD_FILENAME = "thermiq-widget-card.js"
+CARD_VERSION = "1.1.1"
+FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
+
+
+async def async_register_frontend(hass):
+    """Serve the widget card and register it with the frontend.
+
+    Registering the static path twice raises, and add_extra_js_url would queue
+    the module more than once, so this is guarded to run only on first setup.
+    """
+    if hass.data.get(FRONTEND_REGISTERED):
+        return
+
+    frontend_dir = Path(__file__).parent / "frontend"
+    try:
+        await hass.http.async_register_static_paths(
+            [
+                StaticPathConfig(
+                    FRONTEND_URL_BASE,
+                    str(frontend_dir),
+                    # the template is edited in place during development, so
+                    # it must not be cached indefinitely
+                    cache_headers=False,
+                )
+            ]
+        )
+        add_extra_js_url(hass, f"{FRONTEND_URL_BASE}/{CARD_FILENAME}?v={CARD_VERSION}")
+    except Exception as err:
+        _LOGGER.error(
+            "Could not register the ThermIQ dashboard card: %s. "
+            "The integration works, but the widget must be installed manually",
+            err,
+        )
+        return
+
+    hass.data[FRONTEND_REGISTERED] = True
+    _LOGGER.debug("Registered ThermIQ widget card at %s", FRONTEND_URL_BASE)
+
+
 async def async_setup(hass, config):
     """Set up HASL integration"""
     _LOGGER.info("Setup ThermIQ-MQTT integration")
 
     if DOMAIN not in hass.data:
         worker = hass.data.setdefault(DOMAIN, ThermIQWorker(hass))
+    await async_register_frontend(hass)
     return True
 
 # This call is for the ThermIQ global entry migration, not per-heatpump migration
