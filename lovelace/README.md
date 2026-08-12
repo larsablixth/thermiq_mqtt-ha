@@ -48,8 +48,7 @@ files to copy into `www/`, and no dashboard resource to add by hand.
 2. Hard-refresh the browser (Ctrl/Cmd+Shift+R) the first time, so it picks up
    the newly registered module instead of a cached page.
 
-3. Add the card to a dashboard — standalone or as a row inside an
-   `entities` card:
+3. Add it to a dashboard **as a card**:
 
    ```yaml
    type: custom:thermiq-widget-card
@@ -60,6 +59,27 @@ files to copy into `www/`, and no dashboard resource to add by hand.
    ```yaml
    type: custom:thermiq-widget-card
    entity_prefix: thermiq_mqtt_myid
+   ```
+
+   **Not as a row inside an `entities` card.** It renders there, but only
+   sometimes: Home Assistant builds rows with `createRowElement`, and when a
+   custom element isn't defined yet it substitutes an error placeholder and
+   fires `ll-rebuild` once the definition arrives. `hui-card` listens for that
+   event and rebuilds; the entities card does not. Since this card is loaded
+   as a module by the integration, it frequently *isn't* defined yet on a
+   fresh page load — so the row shows an error on every reload, then works
+   after navigating away and back, which makes it look like a caching
+   problem rather than a placement one.
+
+   To keep it next to the entity list, wrap both in a stack — that is what
+   `ThermIQ_Card.yaml` does:
+
+   ```yaml
+   type: vertical-stack
+   cards:
+     - type: custom:thermiq-widget-card
+     - type: entities
+       entities: ...
    ```
 
 Editing the visualization means editing
