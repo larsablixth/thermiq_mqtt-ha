@@ -84,8 +84,12 @@ files to copy into `www/`, and no dashboard resource to add by hand.
 
 Editing the visualization means editing
 `custom_components/thermiq_mqtt/frontend/heatpump_widget.j2` and reloading the
-page — the card fetches the template fresh on each page load, and it is served
-with caching disabled so edits show up immediately.
+page — the card fetches the template with `cache: "no-store"` on each page
+load, which bypasses the browser cache, so edits show up immediately.
+
+The card file itself *is* cached, like every other frontend module, and is
+busted by the `?v=` on its import URL. Editing `thermiq-widget-card.js`
+therefore also means bumping `CARD_VERSION` in `__init__.py`.
 
 ### If it doesn't come up
 

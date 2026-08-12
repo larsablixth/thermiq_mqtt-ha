@@ -62,7 +62,7 @@ PLATFORMS = [
 # hand. Bumping CARD_VERSION busts the browser cache for the card.
 FRONTEND_URL_BASE = f"/{DOMAIN}_frontend"
 CARD_FILENAME = "thermiq-widget-card.js"
-CARD_VERSION = "1.1.1"
+CARD_VERSION = "1.2.0"
 FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 
 
@@ -82,9 +82,19 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
                 StaticPathConfig(
                     FRONTEND_URL_BASE,
                     str(frontend_dir),
-                    # the card and template are edited in place during
-                    # development, so they must not be cached indefinitely
-                    cache_headers=False,
+                    # Cache like every other frontend module. With
+                    # cache_headers=False this path served no Cache-Control at
+                    # all, so the browser revalidated the card over the network
+                    # on every single page load - while Home Assistant's own
+                    # bundle and every HACS module came straight from disk
+                    # cache with max-age=31d. The frontend imports the card
+                    # with a bare dynamic import() that nothing awaits, so
+                    # losing that race means Lovelace builds its cards before
+                    # the element is defined. Freshness comes from the ?v=
+                    # cache-buster for the card, and from the card's own
+                    # fetch(..., {cache: "no-store"}) for the template, which
+                    # bypasses the HTTP cache regardless of these headers.
+                    cache_headers=True,
                 )
             ]
         )
