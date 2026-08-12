@@ -201,7 +201,9 @@ def generate() -> str:
     keys = list(reg_id)
     order = sorted(range(len(keys)), key=lambda index: keys[index])
     for start in range(0, len(order), 12):
-        lines.append("    " + " ".join(f"{index}," for index in order[start : start + 12]))
+        lines.append(
+            "    " + " ".join(f"{index}," for index in order[start : start + 12])
+        )
     lines += ["};", ""]
 
     header = (

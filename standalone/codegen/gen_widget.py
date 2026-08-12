@@ -16,7 +16,7 @@ that subset is an error rather than a guess - if the template grows a feature,
 this script must grow with it, and it will say so loudly.
 
 Correctness is not argued, it is measured: `tests/test_widget.c` renders the
-generated code and `codegen/render_reference.py` renders the same states
+generated code and `codegen/gen_widget_cases.py` renders the same states
 through real Jinja2, and the build fails unless the bytes are identical.
 
 Usage:
@@ -47,7 +47,13 @@ DEMO_ENTITY = "input_boolean.hpviz_demo"
 # t_sup` which is an int on one branch and a string on the other).
 INT, DBL, BOOL, STR, DYN = "int", "dbl", "bool", "str", "dyn"
 
-C_TYPE = {INT: "long long", DBL: "double", BOOL: "bool", STR: "const char *", DYN: "jval"}
+C_TYPE = {
+    INT: "long long",
+    DBL: "double",
+    BOOL: "bool",
+    STR: "const char *",
+    DYN: "jval",
+}
 
 
 class TemplateError(Exception):
@@ -269,7 +275,7 @@ class Compiler:
             # Jinja yields Undefined, which renders as an empty string
             if value.type != STR:
                 raise TemplateError("an if without else must produce a string")
-            return Value(f"({condition.as_bool()} ? {value.code} : \"\")", STR)
+            return Value(f'({condition.as_bool()} ? {value.code} : "")', STR)
         other = self.parse_ternary()
         return self.merge(condition, value, other)
 

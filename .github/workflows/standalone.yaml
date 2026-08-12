@@ -91,6 +91,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # tests/expected/ is generated and not checked in, so the reference the
+      # container is measured against is rendered here, by real Jinja2.
+      - name: Render the Jinja2 reference
+        run: |
+          python3 -m pip install jinja2
+          python3 standalone/codegen/gen_widget_cases.py
       - name: Build
         run: docker build -t thermiq-bridge standalone/
 
