@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ThermIQ</title>
+<style>
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --ink: #1b1f24;
+  --muted: #5c6672;
+  --line: #dfe3e8;
+  --accent: #0288d1;
+  --ok: #1a7f45;
+  --warn: #b26a00;
+  --bad: #c0392b;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171a;
+    --panel: #1d2126;
+    --ink: #e7eaee;
+    --muted: #98a2b3;
+    --line: #2b3138;
+    --accent: #4fc3f7;
+    --ok: #56c98a;
+    --warn: #e0a458;
+    --bad: #ef6f61;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 56px; }
+
+header {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+h1 { font-size: 19px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+h1 small { color: var(--muted); font-weight: 500; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.pill {
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); background: var(--panel);
+  white-space: nowrap;
+}
+.pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+.pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.pill.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+.pill .dot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; margin-right: 5px; vertical-align: 1px;
+}
+
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px;
+}
+#widget-card { padding: 8px; overflow-x: auto; }
+#widget { position: relative; min-height: 340px; min-width: 360px; }
+
+details.card > summary {
+  cursor: pointer; padding: 12px 16px; font-weight: 600; list-style: none;
+  display: flex; align-items: center; gap: 8px;
+}
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::before {
+  content: "›"; display: inline-block; transition: transform .15s ease;
+  color: var(--muted); font-size: 18px; line-height: 1;
+}
+details.card[open] > summary::before { transform: rotate(90deg); }
+summary .count { margin-left: auto; font-weight: 500; color: var(--muted); font-size: 13px; }
+
+.rows { border-top: 1px solid var(--line); }
+.row {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+  padding: 9px 16px; border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: none; }
+.row .label { min-width: 0; }
+.row .name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .key { display: block; font-size: 11.5px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.value { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.value .unit { color: var(--muted); font-size: 12.5px; margin-left: 3px; }
+.value.stale { opacity: .45; }
+
+.state-on { color: var(--ok); font-weight: 600; }
+.state-off { color: var(--muted); }
+.state-problem { color: var(--bad); font-weight: 600; }
+.state-unknown { color: var(--muted); font-style: italic; }
+
+input[type=number], select {
+  font: inherit; color: inherit; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px;
+  max-width: 190px;
+}
+input[type=number] { width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
+input:disabled, select:disabled, button:disabled { opacity: .5; cursor: not-allowed; }
+input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.switch {
+  font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--bg);
+  color: inherit; border-radius: 999px; padding: 4px 14px; font-weight: 600; font-size: 13px;
+}
+.switch[aria-pressed=true] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.saving { animation: pulse .8s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+
+#toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(120%);
+  background: var(--bad); color: #fff; padding: 9px 16px; border-radius: 10px;
+  font-size: 14px; max-width: 90vw; transition: transform .22s ease; z-index: 10;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+footer { color: var(--muted); font-size: 12.5px; text-align: center; margin-top: 22px; }
+footer a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ThermIQ <small id="pump-id"></small></h1>
+    <div class="pills" id="pills"></div>
+  </header>
+
+  <div class="card" id="widget-card"><div id="widget"></div></div>
+  <div id="panels"></div>
+
+  <footer>
+    <span id="footer-note"></span> &middot;
+    <a href="/api/state">API</a> &middot; <a href="/metrics">metrics</a>
+  </footer>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const REFRESH_MS = 5000;
+let meta = null;        // /api/registers, fetched once
+let pending = new Set(); // keys with a write in flight
+
+/* ---- DOM morphing ---------------------------------------------------
+ * The widget is re-rendered server-side every few seconds. Replacing
+ * innerHTML would restart every CSS animation, so the new tree is diffed
+ * into the live one instead: same trick the Home Assistant card uses, so
+ * the flow arrows and the compressor keep turning across refreshes.
+ */
+function morph(live, next) {
+  const keep = new Set();
+  let cursor = live.firstChild;
+  const byId = new Map();
+  for (const child of live.children) if (child.id) byId.set(child.id, child);
+
+  for (const node of Array.from(next.childNodes)) {
+    let match = null;
+    if (node.nodeType === 1 && node.id) {
+      const candidate = byId.get(node.id);
+      if (candidate && !keep.has(candidate) && candidate.nodeName === node.nodeName) match = candidate;
+    } else if (cursor && !keep.has(cursor) && cursor.nodeType === node.nodeType &&
+               (node.nodeType !== 1 || cursor.nodeName === node.nodeName)) {
+      match = cursor;
+    }
+    if (match) {
+      if (match === cursor) cursor = cursor.nextSibling; else live.insertBefore(match, cursor);
+      keep.add(match);
+      if (node.nodeType === 1) morphElement(match, node);
+      else if (match.nodeValue !== node.nodeValue) match.nodeValue = node.nodeValue;
+    } else {
+      live.insertBefore(node, cursor);
+      keep.add(node);
+    }
+  }
+  for (const child of Array.from(live.childNodes)) if (!keep.has(child)) live.removeChild(child);
+}
+function morphElement(live, next) {
+  for (const attr of Array.from(next.attributes))
+    if (live.getAttribute(attr.name) !== attr.value) live.setAttribute(attr.name, attr.value);
+  for (const attr of Array.from(live.attributes))
+    if (!next.hasAttribute(attr.name)) live.removeAttribute(attr.name);
+  // Rewriting <style> text restarts the animations it defines.
+  if (live.nodeName === "STYLE") {
+    if (live.textContent !== next.textContent) live.textContent = next.textContent;
+    return;
+  }
+  morph(live, next);
+}
+
+/* ---- rendering ------------------------------------------------------ */
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function toast(message) {
+  const box = document.getElementById("toast");
+  box.textContent = message;
+  box.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => box.classList.remove("show"), 4000);
+}
+
+function pill(text, kind, withDot) {
+  const node = el("span", "pill" + (kind ? " " + kind : ""));
+  if (withDot) node.appendChild(el("span", "dot"));
+  node.appendChild(document.createTextNode(text));
+  return node;
+}
+
+function renderPills(status) {
+  const pills = document.getElementById("pills");
+  pills.textContent = "";
+  if (status.demo) pills.appendChild(pill("demo data", "warn"));
+  if (status.read_only) pills.appendChild(pill("read-only", "warn"));
+  if (status.debug_writes) pills.appendChild(pill("debug writes", "warn"));
+
+  if (!status.demo) {
+    pills.appendChild(status.connected
+      ? pill("broker connected", "ok", true)
+      : pill(status.last_error || "broker unreachable", "bad", true));
+  }
+  const age = status.seconds_since_message;
+  if (age === null || age === undefined || age < 0) {
+    pills.appendChild(pill("no data yet", "bad"));
+  } else if (status.available) {
+    pills.appendChild(pill("updated " + Math.round(age) + "s ago", "ok"));
+  } else {
+    pills.appendChild(pill("stale for " + Math.round(age) + "s", "bad"));
+  }
+}
+
+function valueCell(def, entry, available) {
+  const cell = el("div", "value" + (available ? "" : " stale"));
+  if (entry.state === "unknown" || entry.state === "unavailable") {
+    cell.appendChild(el("span", "state-unknown", entry.state));
+    return cell;
+  }
+  if (def.domain === "binary_sensor") {
+    const on = entry.state === "on";
+    const bad = on && def.device_class === "problem";
+    cell.appendChild(el("span", bad ? "state-problem" : on ? "state-on" : "state-off",
+                        on ? "on" : "off"));
+    return cell;
+  }
+  cell.appendChild(document.createTextNode(entry.state));
+  if (def.unit) cell.appendChild(el("span", "unit", def.unit));
+  return cell;
+}
+
+function controlCell(def, entry, status) {
+  const disabled = status.read_only || !status.available || pending.has(def.key);
+  if (def.control === "switch") {
+    const on = entry.state === "on";
+    const button = el("button", "switch", on ? "on" : "off");
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(on));
+    button.disabled = disabled;
+    button.onclick = () => write(def.key, { value: on ? 0 : 1 }, button);
+    return button;
+  }
+  if (def.control === "select") {
+    const select = el("select");
+    for (const option of def.options || []) {
+      const item = el("option", null, option);
+      item.value = option;
+      if (option === entry.state) item.selected = true;
+      select.appendChild(item);
+    }
+    select.disabled = disabled;
+    select.onchange = () => write(def.key, { option: select.value }, select);
+    return select;
+  }
+  const input = el("input");
+  input.type = "number";
+  input.value = entry.state === "unknown" ? "" : entry.state;
+  if (def.minimum !== undefined) input.min = def.minimum;
+  if (def.maximum !== undefined) input.max = def.maximum;
+  input.step = def.key === "room_sensor_set_t" ? "0.1" : "1";
+  input.disabled = disabled;
+  input.title = def.minimum !== undefined ? `${def.minimum} to ${def.maximum}` : "";
+  input.onchange = () => write(def.key, { value: Number(input.value) }, input);
+  return input;
+}
+
+function renderPanels(status, values) {
+  const host = document.getElementById("panels");
+  const open = new Set(Array.from(host.querySelectorAll("details[open]")).map(d => d.dataset.panel));
+  const first = host.children.length === 0;
+  const built = document.createDocumentFragment();
+
+  for (const panel of meta.panels) {
+    const defs = meta.registers.filter(def => def.panel === panel.panel);
+    if (!defs.length) continue;
+    const details = el("details", "card");
+    details.dataset.panel = String(panel.panel);
+    // Main status is the one people look at, so it starts open.
+    details.open = first ? panel.panel === 2 : open.has(String(panel.panel));
+
+    const summary = el("summary", null, panel.title);
+    summary.appendChild(el("span", "count", defs.length + ""));
+    details.appendChild(summary);
+
+    const rows = el("div", "rows");
+    for (const def of defs) {
+      const entry = values[def.key] || { state: "unknown" };
+      const row = el("div", "row");
+      const label = el("div", "label");
+      label.appendChild(el("span", "name", def.name));
+      label.appendChild(el("span", "key", def.key));
+      row.appendChild(label);
+      row.appendChild(def.control ? controlCell(def, entry, status)
+                                  : valueCell(def, entry, status.available));
+      rows.appendChild(row);
+    }
+    details.appendChild(rows);
+    built.appendChild(details);
+  }
+  host.textContent = "";
+  host.appendChild(built);
+}
+
+/* ---- data ----------------------------------------------------------- */
+
+async function write(key, body, control) {
+  pending.add(key);
+  control.classList.add("saving");
+  try {
+    const response = await fetch("/api/write", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(Object.assign({ key }, body)),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || response.statusText);
+  } catch (error) {
+    toast(key + ": " + error.message);
+  } finally {
+    pending.delete(key);
+    control.classList.remove("saving");
+    refresh();
+  }
+}
+
+async function refreshWidget() {
+  try {
+    const response = await fetch("/api/widget", { cache: "no-store" });
+    if (!response.ok) return;
+    const html = await response.text();
+    const parsed = document.createElement("template");
+    parsed.innerHTML = html;
+    morph(document.getElementById("widget"), parsed.content);
+  } catch (error) { /* a dropped poll is not worth shouting about */ }
+}
+
+async function refresh() {
+  try {
+    const response = await fetch("/api/state", { cache: "no-store" });
+    if (!response.ok) return;
+    const data = await response.json();
+    renderPills(data.status);
+    renderPanels(data.status, data.values);
+    document.getElementById("pump-id").textContent = data.status.id;
+    document.getElementById("footer-note").textContent =
+      data.status.messages + " messages, " + meta.registers.length + " registers";
+  } catch (error) { /* likewise */ }
+}
+
+async function start() {
+  meta = await (await fetch("/api/registers")).json();
+  await refresh();
+  await refreshWidget();
+  setInterval(refresh, REFRESH_MS);
+  setInterval(refreshWidget, REFRESH_MS);
+  // A tab that was in the background can be several polls stale.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) { refresh(); refreshWidget(); }
+  });
+}
+start();
+</script>
+</body>
+</html>

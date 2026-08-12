@@ -1,0 +1,9 @@
+# The image builds from checked-in generated sources; nothing else is needed.
+build/
+tests/
+codegen/
+web/
+docs/
+*.md
+docker-compose.yml
+.dockerignore

@@ -1,0 +1,35 @@
+# A minimal deployment. Adjust the broker address and the node name, then:
+#
+#     docker compose up -d
+#
+# The UI is then on http://<host>:8080/
+services:
+  thermiq:
+    build: .
+    # Or, once you have pushed an image somewhere:
+    # image: ghcr.io/larsablixth/thermiq-bridge:latest
+    container_name: thermiq
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # --- required ---
+      THERMIQ_MQTT_HOST: "192.168.1.10"       # your Mosquitto
+      # --- the pump ---
+      THERMIQ_NODE: "ThermIQ/ThermIQ-mqtt"    # topic prefix, without /data
+      THERMIQ_ID: "vp1"
+      THERMIQ_LANGUAGE: "en"                  # en, se, fi, no, de
+      # --- optional ---
+      # THERMIQ_MQTT_USERNAME: "mqttuser"
+      # THERMIQ_MQTT_PASSWORD: "secret"
+      # THERMIQ_HEXFORMAT: "true"             # only for old 1.xx firmware
+      # THERMIQ_READ_ONLY: "true"             # refuse every write
+      # THERMIQ_DEBUG_WRITES: "true"          # writes go to dbg_* topics
+      # THERMIQ_PUBLISH_PREFIX: "thermiq/vp1" # republish decoded values
+    # It needs no filesystem at all.
+    read_only: true
+    tmpfs: []
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
