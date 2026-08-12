@@ -236,7 +236,13 @@ class HeatPump:
         else:
             self._cmd_topic = self._mqtt_base + "write"
             self._set_topic = self._mqtt_base + "set"
-        self._hpstate["mqtt_counter"] = 0
+        # Only seed the counter, never reset it. update_config runs on every
+        # options save and every entry reload, and the entities refuse to
+        # write while this is 0 - so resetting it here made every setpoint
+        # change silently do nothing for the ~30 s until the next message,
+        # with nothing above DEBUG to say why.
+        if not isinstance(self._hpstate.get("mqtt_counter"), (int, float)):
+            self._hpstate["mqtt_counter"] = 0
 
         # Provide some debug info
         _LOGGER.debug(

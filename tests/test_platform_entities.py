@@ -56,10 +56,81 @@ async def test_number_write_ignored_without_data():
     hp.send_mqtt_reg.assert_not_awaited()
 
 
-async def test_number_write_skipped_when_unchanged():
+async def test_number_write_resends_an_unchanged_value():
+    """A repeat write must reach the pump.
+
+    This used to be skipped when the cached value already matched. But the
+    cache holds the last value the *pump reported*, not the result of the last
+    write - so if a write was lost, sending the same value again did nothing
+    at all, and there was no way to retry from the UI.
+    """
     hp = _make_heatpump()
     entity = ThermIQNumber(hp, "indoor_requested_t")
     hp._hpstate["r32"] = 21
+    await entity.async_set_native_value(21)
+    hp.send_mqtt_reg.assert_awaited_once_with("indoor_requested_t", 21, 0xFFFF)
+
+
+async def test_switch_write_resends_an_unchanged_value():
+    hp = _make_heatpump()
+    entity = ThermIQSwitch(hp, "heatpump_evu_block")
+    hp._hpstate["evu"] = 1
+    await entity.async_turn_on()
+    hp.send_mqtt_reg.assert_awaited_once_with("heatpump_evu_block", 1, 0xFFFF)
+
+
+async def test_select_write_resends_an_unchanged_value():
+    hp = _make_heatpump()
+    entity = ThermIQSelect(hp, "main_mode")
+    hp._hpstate["r33"] = 2
+    await entity.async_select_option(entity.options[2])
+    hp.send_mqtt_reg.assert_awaited_once_with("main_mode", 2, 0xFFFF)
+
+
+async def test_writes_survive_a_config_reload():
+    """Saving options must not re-arm the "no data yet" guard.
+
+    update_config runs on every options save and every entry reload, and it
+    used to reset mqtt_counter to 0. The entities refuse to write while that
+    is 0, so for the ~30 s until the pump's next message every setpoint change
+    was silently dropped - nothing published, nothing logged above DEBUG, and
+    the control springing back in the UI.
+    """
+    hp = _make_heatpump()
+    entity = ThermIQNumber(hp, "indoor_requested_t")
+
+    entry = MagicMock()
+    entry.data = {
+        "id_name": "vp1",
+        "mqtt_node": "ThermIQ/ThermIQ-mqtt",
+        "language": "en",
+        "hexformat": False,
+        "thermiq_dbg": False,
+    }
+    await hp.update_config(entry)
+
+    assert hp._hpstate["mqtt_counter"] == 1, "the message count must survive a reload"
+    await entity.async_set_native_value(21)
+    hp.send_mqtt_reg.assert_awaited_once_with("indoor_requested_t", 21, 0xFFFF)
+
+
+async def test_first_setup_still_refuses_to_write():
+    """The guard itself must still work: no write before the pump has spoken."""
+    hp = _make_heatpump(has_data=False)
+    del hp._hpstate["mqtt_counter"]  # as it is before any update_config
+
+    entry = MagicMock()
+    entry.data = {
+        "id_name": "vp1",
+        "mqtt_node": "ThermIQ/ThermIQ-mqtt",
+        "language": "en",
+        "hexformat": False,
+        "thermiq_dbg": False,
+    }
+    await hp.update_config(entry)
+
+    assert hp._hpstate["mqtt_counter"] == 0
+    entity = ThermIQNumber(hp, "indoor_requested_t")
     await entity.async_set_native_value(21)
     hp.send_mqtt_reg.assert_not_awaited()
 
