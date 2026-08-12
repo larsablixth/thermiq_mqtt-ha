@@ -27,6 +27,7 @@ from homeassistant.components.recorder.db_schema import (
     StatesMeta,
 )
 from homeassistant.components import persistent_notification
+from homeassistant.helpers import device_registry as dr
 
 from .const import (
     DOMAIN,
@@ -910,9 +911,32 @@ def _notify_entity_id_changes(
     )
 
 
+def _remove_stale_devices(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Drop device entries left behind by older versions.
+
+    This integration deliberately creates no devices: with ~190 entities under
+    one device, Home Assistant would prefix every friendly name with the
+    device name and they would all be too long (see 729669a). But versions up
+    to v3.3.1 - and upstream - did create one, and Home Assistant keeps a
+    device for as long as a config entry references it. The result is an empty
+    device that looks like a broken heatpump, reported in #28.
+
+    Anything attached to this entry can only be such a leftover, so it goes.
+    """
+    registry = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
+        _LOGGER.info(
+            "Removing stale device [%s] left by an earlier version; this "
+            "integration does not group entities under a device",
+            device.name or device.id,
+        )
+        registry.async_update_device(device.id, remove_config_entry_id=entry.entry_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up component from a config entry, config_entry contains data from config entry database."""
     _LOGGER.info("Setup ThermIQ-MQTT [%s]", entry.data.get(CONF_ID, "unknown"))
+    _remove_stale_devices(hass, entry)
     await _async_migrate_entry(hass, entry)
 
     async def handle_hass_started(_event: Event) -> None:
