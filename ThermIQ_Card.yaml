@@ -2,19 +2,19 @@
 # ##### ThermIQ Dashboard Card.
 # Add to HA by "Edit Dashboard, + Add Card -> Manual" and paste this whole file
 #
-# ##### IF YOUR UNIQUE ID IS NOT "vp1", THERE ARE TWO STEPS - AND THE FIRST
-# ##### IS A REPLACE-ALL, NOT A COUPLE OF EDITS:
+# ##### IF YOUR UNIQUE ID IS NOT "vp1", THERE IS EXACTLY ONE THING TO DO:
 #
-#   1. Replace EVERY occurrence of "_vp1" in this file with your id - there
-#      are dozens of them. Ctrl+F, find and replace all. Do not hand-edit a
-#      few and assume that is it.
-#   2. THEN uncomment entity_prefix on the widget card below and set it to
-#      thermiq_mqtt_<your id>. Step 1 does not reach it: the widget carries
-#      its own default and will silently keep reading vp1 entities that do
-#      not exist.
+#   Replace EVERY occurrence of "_vp1" in this file with your id - there are
+#   dozens of them. Ctrl+F, find and replace all, and that is the whole job.
 #
-# Miss either and the affected rows show as unavailable, or as controls that
-# do nothing, which looks like a broken integration rather than a wrong id.
+#   That includes the widget's entity_prefix, which is spelled out below
+#   rather than left commented precisely so the same find-and-replace reaches
+#   it. It used to be a commented-out second step that people missed, and
+#   missing it left the widget silently reading vp1 entities that do not
+#   exist. Thanks to @mahagr for the suggestion.
+#
+# Miss any of them and those rows show as unavailable, or as controls that do
+# nothing, which looks like a broken integration rather than a wrong id.
 #
 # ##### WHY A vertical-stack RATHER THAN ONE entities CARD
 #
@@ -37,7 +37,7 @@ cards:
 ## thermiq_mqtt_<your id>. The widget does not read the ids below; it has its
 ## own, and without this it reads vp1 entities that do not exist.
   - type: custom:thermiq-widget-card
-#    entity_prefix: thermiq_mqtt_vp1
+    entity_prefix: thermiq_mqtt_vp1
 ## Runtime statistics (built-in statistics-graph)
   - type: statistics-graph
     title: Compressor runtime (h/week)
