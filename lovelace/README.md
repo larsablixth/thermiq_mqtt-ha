@@ -139,6 +139,31 @@ the lifetime of the tab: if you loaded the page while Home Assistant was
 restarting, the card stays broken until you reload it again once Home
 Assistant is fully up, no matter what you fix in between.
 
+## If the card will not behave
+
+Every failure mode above is browser-side: a module that has to load, define a custom element,
+and win a race against Lovelace's first render. If you are on Home Assistant OS or Supervised
+and would rather not have that machinery at all, the same widget is available with none of it.
+
+[**thermiq-bridge**](https://github.com/larsablixth/thermiq-bridge) draws this picture from
+this very template - byte-for-byte identical, asserted in its CI - and serves it as its own
+page. Installed as an add-on it appears in your sidebar: *Settings &rarr; Add-ons &rarr; Add-on
+store &rarr; three-dot menu &rarr; Repositories*, add
+`https://github.com/larsablixth/thermiq-bridge`, install **ThermIQ Bridge**, set `mqtt_host`,
+`node` and `id`.
+
+It is an alternative, not a replacement, and the honest trade is:
+
+| | this card | the add-on |
+|---|---|---|
+| sits among your other cards | yes | no - full-page sidebar panel only |
+| works on Container / Core installs | yes | no - needs Supervisor |
+| custom element to load | yes | none |
+| runtime behind it | since v3.5.0, several installs | first installable 12 Aug 2026 |
+
+The aarch64 image a Raspberry Pi would run is published but has not yet been run by anyone, so
+treat it accordingly for now.
+
 ## Optional extras
 
 **Pool / second heating circuit.** This needs an optional expansion card
