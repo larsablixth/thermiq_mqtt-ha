@@ -2,12 +2,16 @@
 # ##### ThermIQ Dashboard Card.
 # Add to HA by "Edit Dashboard, + Add Card -> Manual" and paste this whole file
 #
-# ##### IF YOUR UNIQUE ID IS NOT "vp1", TWO THINGS NEED CHANGING:
+# ##### IF YOUR UNIQUE ID IS NOT "vp1", THERE ARE TWO STEPS - AND THE FIRST
+# ##### IS A REPLACE-ALL, NOT A COUPLE OF EDITS:
 #
-#   1. Replace every "_vp1" below with your id. Ctrl+F, find and replace.
-#   2. Add an entity_prefix to the widget card - see the comment on it below.
-#      Find-and-replace does NOT fix the widget: it carries its own default
-#      and will silently keep reading vp1 entities that do not exist.
+#   1. Replace EVERY occurrence of "_vp1" in this file with your id - there
+#      are dozens of them. Ctrl+F, find and replace all. Do not hand-edit a
+#      few and assume that is it.
+#   2. THEN uncomment entity_prefix on the widget card below and set it to
+#      thermiq_mqtt_<your id>. Step 1 does not reach it: the widget carries
+#      its own default and will silently keep reading vp1 entities that do
+#      not exist.
 #
 # Miss either and the affected rows show as unavailable, or as controls that
 # do nothing, which looks like a broken integration rather than a wrong id.
