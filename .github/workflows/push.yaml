@@ -12,7 +12,7 @@ jobs:
     runs-on: "ubuntu-latest"
     name: Validate
     steps:
-        - uses: "actions/checkout@v2"
+        - uses: "actions/checkout@v4"
         - name: HACS validation
           uses: "hacs/action@main"
           with:
@@ -26,11 +26,21 @@ jobs:
     runs-on: "ubuntu-latest"
     name: Check style formatting
     steps:
-        - uses: "actions/checkout@v2"
-        - uses: "actions/setup-python@v1"
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
           with:
             python-version: "3.x"
-        - run: python3 -m pip install black
-        - run: black .
+        # Pinned: an unpinned black turns CI red on its own the day a new
+        # release changes its formatting, with no commit to blame.
+        - run: python3 -m pip install "black==25.11.0"
+        # --check reports instead of reformatting into a runner that is then
+        # thrown away; --diff shows exactly what it would change.
+        #
+        # Not blocking yet, deliberately: every file in this repository would
+        # be reformatted today, and turning this red would mean a
+        # reformatting commit nobody asked for. Drop this line whenever the
+        # formatting pass has happened and the job starts meaning something.
+        - run: black --check --diff .
+          continue-on-error: true
 
   
