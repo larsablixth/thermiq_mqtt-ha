@@ -223,6 +223,13 @@ See this [thread](https://github.com/ThermIQ/thermiq_mqtt-ha/issues/66#issuecomm
 #### Features and Limitations
 - Currently provides all data from the heatpump in the form of sensors and binary sensors
 - Allows control over the heatpump 
+#### Running without Home Assistant
+If you want the same data and controls but not Home Assistant, [**thermiq-bridge**](standalone/README.md) is a standalone container: it reads the same
+MQTT, decodes the same registers from the same register table, and draws the same animated
+widget from the same template - as a single static binary in a `FROM scratch` image, with a
+web UI, a JSON API and Prometheus metrics. Try it with
+`docker run --rm -p 8080:8080 -e THERMIQ_DEMO=1 thermiq-bridge`.
+
 #### ThermIQ-USB Support
 Tom R has created [a Node-RED flow](https://github.com/tomrosenback/thermiq-node-red-homeassistant-config) converting the previous version, ThermIQ-USB, to use the same MQTT messages making it compatible with this integration.
 

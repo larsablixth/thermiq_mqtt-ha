@@ -1,0 +1,9 @@
+# Build output.
+build/
+
+# Produced by `make test`, which regenerates them from widget_cases.json via
+# real Jinja2 before every run. The generated *sources* under src/ are checked
+# in on purpose - so building needs only a C compiler - but these are test
+# fixtures with no such reason to live in the history.
+tests/expected/
+tests/widget_cases_gen.c

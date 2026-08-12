@@ -1,0 +1,198 @@
+name: Standalone bridge
+
+# The standalone C bridge in standalone/ is a separate product from the Home
+# Assistant integration, so it has its own workflow rather than slowing that
+# one down. It still depends on two files outside its own directory - the
+# register table and the widget template - so changes to those must trigger it
+# too, or the drift checks below would never run when drift actually happens.
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths:
+      - "standalone/**"
+      - "custom_components/thermiq_mqtt/heatpump/thermiq_regs.py"
+      - "custom_components/thermiq_mqtt/frontend/heatpump_widget.j2"
+      - ".github/workflows/standalone.yaml"
+  pull_request:
+    paths:
+      - "standalone/**"
+      - "custom_components/thermiq_mqtt/heatpump/thermiq_regs.py"
+      - "custom_components/thermiq_mqtt/frontend/heatpump_widget.j2"
+      - ".github/workflows/standalone.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  generated:
+    name: Generated sources are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # The register table and the widget are generated from the integration's
+      # own files. If someone edits thermiq_regs.py or heatpump_widget.j2 and
+      # does not re-run the generators, the bridge silently keeps decoding and
+      # drawing the old version - which is exactly the failure this catches.
+      - run: python3 -m pip install jinja2
+      - run: make -C standalone check-generated
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python3 -m pip install jinja2
+      # Renders the widget cases through real Jinja2, then requires the
+      # generated C renderer to reproduce them byte for byte.
+      - name: Tests
+        run: make -C standalone test
+      - name: Build
+        run: make -C standalone
+      # Nothing in this tree may warn under the strict set; it is the only
+      # review a C program gets for free.
+      - name: No warnings
+        run: |
+          make -C standalone clean
+          make -C standalone CFLAGS="-Os -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Wshadow -Wconversion -Wsign-conversion \
+            -Wstrict-prototypes -Wmissing-prototypes -Wcast-qual \
+            -Wpointer-arith -fno-common -Werror"
+
+  cross:
+    name: Static builds for a Raspberry Pi
+    runs-on: ubuntu-latest
+    env:
+      # Pinned so a zig release cannot change what this job builds.
+      ZIG_VERSION: "0.16.0"
+    steps:
+      - uses: actions/checkout@v4
+
+      # musl, not glibc. A statically linked glibc still needs its NSS shared
+      # libraries at runtime for getaddrinfo, so a "static" glibc build would
+      # fail to resolve the broker's hostname on a machine with a different
+      # glibc - exactly the situation a drop-on-a-Pi binary is for. zig ships
+      # musl for every target and needs no cross toolchain installed.
+      - name: Cache zig
+        id: zig
+        uses: actions/cache@v4
+        with:
+          path: ~/zig
+          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
+      - name: Install zig
+        if: steps.zig.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/zig
+          curl -sSL "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" \
+            | tar xJ -C ~/zig --strip-components=1
+
+      - name: aarch64 (Pi 3/4/5, 64-bit)
+        run: |
+          make -C standalone clean
+          make -C standalone CC="$HOME/zig/zig cc" TARGET=aarch64-linux-musl \
+            LDFLAGS="-static -Wl,--gc-sections"
+          file standalone/build/thermiq-bridge
+          # A dynamically linked result would defeat the point of the job.
+          file standalone/build/thermiq-bridge | grep -q "statically linked"
+          mv standalone/build/thermiq-bridge thermiq-bridge-aarch64
+
+      - name: armv7 (older 32-bit Pi)
+        run: |
+          make -C standalone clean
+          make -C standalone CC="$HOME/zig/zig cc" TARGET=arm-linux-musleabihf \
+            LDFLAGS="-static -Wl,--gc-sections"
+          file standalone/build/thermiq-bridge
+          file standalone/build/thermiq-bridge | grep -q "statically linked"
+          mv standalone/build/thermiq-bridge thermiq-bridge-armv7
+
+      - name: x86-64
+        run: |
+          make -C standalone clean
+          make -C standalone CC="$HOME/zig/zig cc" TARGET=x86_64-linux-musl \
+            LDFLAGS="-static -Wl,--gc-sections"
+          file standalone/build/thermiq-bridge | grep -q "statically linked"
+          mv standalone/build/thermiq-bridge thermiq-bridge-x86_64
+
+      - name: Sizes
+        run: ls -l thermiq-bridge-*
+
+      # So anyone wanting to run this on a Pi without Docker can just download
+      # one file from the run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thermiq-bridge-binaries
+          path: thermiq-bridge-*
+          if-no-files-found: error
+
+  image:
+    name: Image builds and serves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # tests/expected/ is generated and not checked in, so the reference the
+      # container is measured against is rendered here, by real Jinja2.
+      - name: Render the Jinja2 reference
+        run: |
+          python3 -m pip install jinja2
+          python3 standalone/codegen/gen_widget_cases.py
+      - name: Build
+        run: docker build -t thermiq-bridge standalone/
+
+      # A scratch image either works or does nothing at all, so prove it runs.
+      - name: Start it in demo mode
+        run: |
+          docker run -d --name thermiq -p 8080:8080 \
+            -e THERMIQ_DEMO=1 thermiq-bridge
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/healthz > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/healthz
+
+      - name: Endpoints answer
+        run: |
+          curl -fsS http://127.0.0.1:8080/ > /dev/null
+          curl -fsS http://127.0.0.1:8080/api/state > /dev/null
+          curl -fsS http://127.0.0.1:8080/api/registers > /dev/null
+          curl -fsS http://127.0.0.1:8080/metrics > /dev/null
+
+      # The end-to-end version of the parity test: what the container actually
+      # serves must equal what Jinja2 renders for the same states.
+      - name: Served widget matches the Jinja2 reference
+        run: |
+          curl -fsS http://127.0.0.1:8080/api/widget > /tmp/served.html
+          cmp /tmp/served.html standalone/tests/expected/demo.html
+          echo "identical: $(wc -c < /tmp/served.html) bytes"
+
+      - name: Writes are validated
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' \
+            -d '{"key":"indoor_requested_t","value":95}' \
+            http://127.0.0.1:8080/api/write)
+          test "$code" = "400" || { echo "expected 400, got $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' \
+            -d '{"key":"indoor_requested_t","value":21}' \
+            http://127.0.0.1:8080/api/write)
+          test "$code" = "200" || { echo "expected 200, got $code"; exit 1; }
+
+      - name: The container's own health check
+        run: docker exec thermiq /thermiq-bridge --healthcheck
+
+      - name: Size
+        run: docker image ls thermiq-bridge --format '{{.Size}}'
+
+      - name: Logs
+        if: always()
+        run: docker logs thermiq || true
