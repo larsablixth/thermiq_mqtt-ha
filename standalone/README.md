@@ -216,8 +216,14 @@ runs to prove they are current.
 Cross-compiling for a Raspberry Pi, with no cross toolchain to install:
 
 ```bash
-zig cc -target aarch64-linux-musl -static ...   # see the Makefile's CC/TARGET
+make CC="zig cc" TARGET=aarch64-linux-musl LDFLAGS="-static -Wl,--gc-sections"
 ```
+
+Use `arm-linux-musleabihf` for an older 32-bit Pi. musl rather than glibc on
+purpose: a statically linked glibc still wants its NSS shared libraries at
+runtime to resolve a hostname, which is the one thing a single-file binary
+must not need. CI builds all three and attaches them to the run, so you can
+also just download one.
 
 ## Layout
 

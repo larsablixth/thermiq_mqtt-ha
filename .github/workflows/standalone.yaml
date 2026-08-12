@@ -67,24 +67,69 @@ jobs:
             -Wpointer-arith -fno-common -Werror"
 
   cross:
-    name: Cross-compile for a Raspberry Pi
+    name: Static builds for a Raspberry Pi
     runs-on: ubuntu-latest
+    env:
+      # Pinned so a zig release cannot change what this job builds.
+      ZIG_VERSION: "0.16.0"
     steps:
       - uses: actions/checkout@v4
-      - name: Install cross toolchains
+
+      # musl, not glibc. A statically linked glibc still needs its NSS shared
+      # libraries at runtime for getaddrinfo, so a "static" glibc build would
+      # fail to resolve the broker's hostname on a machine with a different
+      # glibc - exactly the situation a drop-on-a-Pi binary is for. zig ships
+      # musl for every target and needs no cross toolchain installed.
+      - name: Cache zig
+        id: zig
+        uses: actions/cache@v4
+        with:
+          path: ~/zig
+          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
+      - name: Install zig
+        if: steps.zig.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
-      - name: aarch64
+          mkdir -p ~/zig
+          curl -sSL "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" \
+            | tar xJ -C ~/zig --strip-components=1
+
+      - name: aarch64 (Pi 3/4/5, 64-bit)
         run: |
           make -C standalone clean
-          make -C standalone CC=aarch64-linux-gnu-gcc
+          make -C standalone CC="$HOME/zig/zig cc" TARGET=aarch64-linux-musl \
+            LDFLAGS="-static -Wl,--gc-sections"
           file standalone/build/thermiq-bridge
-      - name: armv7
+          # A dynamically linked result would defeat the point of the job.
+          file standalone/build/thermiq-bridge | grep -q "statically linked"
+          mv standalone/build/thermiq-bridge thermiq-bridge-aarch64
+
+      - name: armv7 (older 32-bit Pi)
         run: |
           make -C standalone clean
-          make -C standalone CC=arm-linux-gnueabihf-gcc
+          make -C standalone CC="$HOME/zig/zig cc" TARGET=arm-linux-musleabihf \
+            LDFLAGS="-static -Wl,--gc-sections"
           file standalone/build/thermiq-bridge
+          file standalone/build/thermiq-bridge | grep -q "statically linked"
+          mv standalone/build/thermiq-bridge thermiq-bridge-armv7
+
+      - name: x86-64
+        run: |
+          make -C standalone clean
+          make -C standalone CC="$HOME/zig/zig cc" TARGET=x86_64-linux-musl \
+            LDFLAGS="-static -Wl,--gc-sections"
+          file standalone/build/thermiq-bridge | grep -q "statically linked"
+          mv standalone/build/thermiq-bridge thermiq-bridge-x86_64
+
+      - name: Sizes
+        run: ls -l thermiq-bridge-*
+
+      # So anyone wanting to run this on a Pi without Docker can just download
+      # one file from the run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: thermiq-bridge-binaries
+          path: thermiq-bridge-*
+          if-no-files-found: error
 
   image:
     name: Image builds and serves
