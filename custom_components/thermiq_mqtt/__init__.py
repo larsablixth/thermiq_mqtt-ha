@@ -63,7 +63,72 @@ PLATFORMS = [
 FRONTEND_URL_BASE = f"/{DOMAIN}_frontend"
 CARD_FILENAME = "thermiq-widget-card.js"
 CARD_VERSION = "1.2.0"
+CARD_URL = f"{FRONTEND_URL_BASE}/{CARD_FILENAME}"
 FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
+
+# How the card module reaches the browser.
+#
+#   "extra_js"  - add_extra_js_url. The module is imported from the frontend
+#                 index at page bootstrap. What we have always shipped.
+#   "resource"  - registered in Lovelace's own resource list, the documented
+#                 route every HACS card uses.
+#
+# Never both: each mechanism imports the module under its own URL, and a
+# second evaluation of the module calls customElements.define with a name that
+# already exists, which throws.
+#
+# Kept on "extra_js" deliberately. Resources are NOT awaited before Lovelace
+# renders either - both mechanisms race - so switching is not established to
+# fix anything, and it is here to be flipped if a frontend turns out to lack
+# the whenDefined -> ll-rebuild recovery that makes losing the race harmless.
+# See issue #28.
+CARD_DELIVERY = "extra_js"
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant, url: str) -> bool:
+    """List the card in Lovelace's resource collection.
+
+    Returns True only if the card is now listed, so the caller knows whether
+    it still has to fall back to add_extra_js_url. False for every reason it
+    cannot be: Lovelace not set up yet, YAML-mode resources (which the user
+    owns in configuration.yaml and we must not touch), or an internal API that
+    moved - none of which should stop the integration loading.
+
+    An existing entry for the same file is updated rather than duplicated, so
+    a CARD_VERSION bump changes the ?v= in place instead of leaving the old
+    URL behind to be imported alongside the new one.
+    """
+    try:
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+    except ImportError:  # pragma: no cover - only on a frontend-less build
+        return False
+
+    data = hass.data.get(LOVELACE_DATA)
+    if data is None:
+        _LOGGER.debug("Lovelace is not set up yet; using add_extra_js_url instead")
+        return False
+    if getattr(data, "resource_mode", None) != "storage":
+        # YAML mode: the resource list is the user's file, not ours to edit.
+        _LOGGER.debug("Lovelace resources are in YAML mode; not adding the card")
+        return False
+
+    resources = data.resources
+    if not resources.loaded:
+        await resources.async_load()
+        resources.loaded = True
+
+    for item in resources.async_items():
+        existing = str(item.get("url", ""))
+        if existing.split("?", 1)[0] != CARD_URL:
+            continue
+        if existing != url:
+            await resources.async_update_item(item["id"], {"url": url})
+            _LOGGER.debug("Updated the ThermIQ card resource to %s", url)
+        return True
+
+    await resources.async_create_item({"res_type": "module", "url": url})
+    _LOGGER.debug("Registered the ThermIQ card as a Lovelace resource: %s", url)
+    return True
 
 
 async def async_register_frontend(hass: HomeAssistant) -> None:
@@ -98,7 +163,13 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
                 )
             ]
         )
-        add_extra_js_url(hass, f"{FRONTEND_URL_BASE}/{CARD_FILENAME}?v={CARD_VERSION}")
+        versioned = f"{CARD_URL}?v={CARD_VERSION}"
+        if CARD_DELIVERY == "resource" and await _async_register_lovelace_resource(
+            hass, versioned
+        ):
+            pass  # listed as a Lovelace resource; must not also add_extra_js_url
+        else:
+            add_extra_js_url(hass, versioned)
     except Exception as err:  # noqa: BLE001 - the integration must still load
         _LOGGER.error(
             "Could not register the ThermIQ dashboard card: %s. "
