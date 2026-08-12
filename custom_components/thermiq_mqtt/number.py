@@ -102,13 +102,16 @@ class ThermIQNumber(NumberEntity):
                 "Ignoring set for %s: no data from heatpump yet", self.entity_id
             )
             return
-        if value != self._hpstate.get(self._reg):
-            self._hpstate[self._reg] = value
-            # Refresh all entities of this heatpump
-            self._heatpump._hass.bus.fire(
-                f"{self._heatpump._domain}_{self._heatpump._id}_msg_rec_event", {}
-            )
-            await self._heatpump.send_mqtt_reg(self._key, value, 0xFFFF)
+        # Always publish, even when the cached value already matches: the
+        # cache reflects the last message from the pump, not what the pump did
+        # with the last write, so skipping here makes a lost write impossible
+        # to retry.
+        self._hpstate[self._reg] = value
+        # Refresh all entities of this heatpump
+        self._heatpump._hass.bus.fire(
+            f"{self._heatpump._domain}_{self._heatpump._id}_msg_rec_event", {}
+        )
+        await self._heatpump.send_mqtt_reg(self._key, value, 0xFFFF)
 
     async def async_added_to_hass(self) -> None:
         """Refresh state on each heatpump message; auto-removed on unload."""
