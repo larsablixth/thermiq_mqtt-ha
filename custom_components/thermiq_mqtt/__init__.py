@@ -77,12 +77,28 @@ FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 # second evaluation of the module calls customElements.define with a name that
 # already exists, which throws.
 #
-# Kept on "extra_js" deliberately. Resources are NOT awaited before Lovelace
-# renders either - both mechanisms race - so switching is not established to
-# fix anything, and it is here to be flipped if a frontend turns out to lack
-# the whenDefined -> ll-rebuild recovery that makes losing the race harmless.
-# See issue #28.
-CARD_DELIVERY = "extra_js"
+# "resource" is the default because "extra_js" is measurably broken, for a
+# reason that took a browser to find (#28).
+#
+# add_extra_js_url imports the card from the frontend index, at page
+# bootstrap - earlier than any other custom card, which all arrive later as
+# Lovelace resources. Something in a loaded page then patches
+# customElements.define in place: it is native at document-start and a
+# polyfill implementation by the time the dashboard renders, with its own
+# internal registry. A define() that ran before that patch lands in the
+# native registry and is invisible to the patched one Home Assistant then
+# queries - so the element exists, window.customCards lists it, the card's
+# own banner is in the console, and Lovelace still reports "Custom element
+# doesn't exist", permanently, for that page load.
+#
+# Measured on a live installation, same browser, same steps:
+#
+#   extra_js   first load: undefined, 0 widgets | after Ctrl+F5: undefined, 0
+#   resource   first load: function,  1 widget  | after Ctrl+F5: function,  1
+#
+# Being a resource puts us in the same load phase as every other custom card,
+# after the patch. That is why every HACS card works and only ours did not.
+CARD_DELIVERY = "resource"
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant, url: str) -> bool:
