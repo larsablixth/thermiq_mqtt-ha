@@ -18,11 +18,14 @@
  * happened when the template moved out of www/ and into the integration.
  *
  * Editing workflow: edit heatpump_widget.j2 next to this file in the
- * integration folder and reload the page. The integration serves this
- * directory with caching disabled, so no cache-busting is needed.
+ * integration folder and reload the page. The template is fetched with
+ * cache: "no-store", which bypasses the HTTP cache, so edits show up on the
+ * next reload even though the directory is served with normal cache headers.
+ * Editing *this* file needs CARD_VERSION in __init__.py bumped, because the
+ * browser caches it against the ?v= in the import URL.
  */
 
-const VERSION = "1.1.1";
+const VERSION = "1.2.0";
 const DEFAULT_URL = "/thermiq_mqtt_frontend/heatpump_widget.j2";
 const DEFAULT_PREFIX = "thermiq_mqtt_vp1"; // integration domain + entry id
 
