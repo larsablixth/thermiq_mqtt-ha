@@ -8,12 +8,13 @@ no full Home Assistant instance is needed.
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.thermiq_mqtt.heatpump import HeatPump
+from custom_components.thermiq_mqtt.heatpump.thermiq_regs import FIELD_REGNUM, reg_id
 from custom_components.thermiq_mqtt.number import ThermIQNumber
 from custom_components.thermiq_mqtt.select import ThermIQSelect
 from custom_components.thermiq_mqtt.switch import ThermIQSwitch
 
 
-def _make_heatpump(has_data=True):
+def _make_heatpump(has_data=True, echoed=None):
     hass = MagicMock()
     hass.loop.time.return_value = 1000.0
     entry = MagicMock()
@@ -22,6 +23,12 @@ def _make_heatpump(has_data=True):
     hp._hpstate["mqtt_counter"] = 1 if has_data else 0
     if has_data:
         hp._last_message_time = 1000.0
+        # A pump that has sent data has sent registers; entities are only
+        # available for registers this pump actually reports. Default to the
+        # generous case so each test states its own capability question.
+        hp._echoed = set(reg_id[k][FIELD_REGNUM] for k in reg_id)
+    if echoed is not None:
+        hp._echoed = set(echoed)
     hp.send_mqtt_reg = AsyncMock()  # type: ignore[method-assign]
     return hp
 
@@ -259,3 +266,49 @@ async def test_binary_sensor_writes_on_availability_transition_only():
     hp._last_message_time = None
     await ent._async_update_event(None)
     assert ent.async_write_ha_state.call_count == 2
+
+
+# --- Capability detection from the echoed payload ----------------------
+#
+# EVU is ThermIQ-Room2 only and the room-sensor setpoint needs a Room or a
+# Room2. Rather than keep a table of models - which the user can defeat by
+# renaming the MQTT node, and which goes stale when a new interface ships -
+# the pump is taken at its word: what it sends is what it can drive.
+
+
+def test_control_is_unavailable_when_the_pump_never_sends_the_register():
+    """Plain ThermIQ-MQTT: no EVU in /data, so no EVU switch to press."""
+    hp = _make_heatpump(echoed={"r32", "mqtt_counter"})
+    hp._last_message_time = 1000.0
+    evu = ThermIQSwitch(hp, "heatpump_evu_block")
+    room = ThermIQNumber(hp, "room_sensor_set_t")
+    assert evu.available is False
+    assert room.available is False
+    # ...while a register it does send stays available
+    assert ThermIQNumber(hp, "indoor_requested_t").available is True
+
+
+def test_control_is_available_when_the_pump_echoes_the_register():
+    """ThermIQ-Room2: EVU and INDR_T come back in /data, so both work."""
+    hp = _make_heatpump(echoed={"evu", "indr_t", "r32"})
+    hp._last_message_time = 1000.0
+    assert ThermIQSwitch(hp, "heatpump_evu_block").available is True
+    assert ThermIQNumber(hp, "room_sensor_set_t").available is True
+
+
+def test_capability_is_sticky_once_seen():
+    """A key present in one message and absent from the next must not flap."""
+    hp = _make_heatpump(echoed=set())
+    hp._last_message_time = 1000.0
+    evu = ThermIQSwitch(hp, "heatpump_evu_block")
+    assert evu.available is False
+    hp._echoed |= {"evu"}  # one message carried it
+    assert evu.available is True
+    hp._echoed |= {"r32"}  # a later message did not
+    assert evu.available is True
+
+
+def test_silence_still_wins_over_capability():
+    """Supporting a register does not make a silent pump available."""
+    hp = _make_heatpump(has_data=False, echoed={"evu"})
+    assert ThermIQSwitch(hp, "heatpump_evu_block").available is False

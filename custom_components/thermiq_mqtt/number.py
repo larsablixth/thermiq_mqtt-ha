@@ -83,8 +83,12 @@ class ThermIQNumber(NumberEntity):
 
     @property
     def available(self) -> bool:
-        """Unavailable until the first message and while the pump is silent."""
-        return self._heatpump.available
+        """Unavailable while silent, or if this pump never sends the register.
+
+        See HeatPump.supports: a control the hardware cannot drive is worse
+        than a missing one, because it looks like it works.
+        """
+        return self._heatpump.available and self._heatpump.supports(self._reg)
 
     @property
     def native_value(self) -> float | None:

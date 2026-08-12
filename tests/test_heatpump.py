@@ -177,3 +177,69 @@ async def test_send_mqtt_reg_rejects_non_numeric_value():
     ) as publish:
         await hp.send_mqtt_reg("indoor_requested_t", "high", 0xFFFF)
         publish.assert_not_called()
+
+
+# --- Capability detection from what the pump actually sends -------------
+
+
+async def test_plain_mqtt_payload_reports_no_evu_or_room_sensor():
+    """A plain ThermIQ-MQTT /data payload mentions neither key."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {
+                "Client_Name": "ThermIQ_x",
+                "app_info": "ThermIQ-mqtt 2.22",
+                "d0": 21,
+                "d50": 15,
+            }
+        )
+    )
+    assert hp.supports("r00") is True
+    assert hp.supports("evu") is False
+    assert hp.supports("indr_t") is False
+
+
+async def test_room2_payload_reports_evu_and_room_sensor():
+    """A ThermIQ-Room2 echoes EVU and INDR_T back, so both are drivable."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {
+                "Client_Name": "ThermIQ_x",
+                "app_info": "ThermIQ-room2 2.68",
+                "d0": 17,
+                "EVU": 0,
+                "INDR_T": 21.1,
+            }
+        )
+    )
+    assert hp.supports("evu") is True
+    assert hp.supports("indr_t") is True
+
+
+async def test_capability_survives_a_message_that_omits_it():
+    """Sticky: MISMATCH-style intermittent keys must not remove a control."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message({"Client_Name": "ThermIQ_x", "EVU": 1, "d0": 17})
+    )
+    assert hp.supports("evu") is True
+    await hp.message_received(_message({"Client_Name": "ThermIQ_x", "d0": 18}))
+    assert hp.supports("evu") is True
+
+
+async def test_integration_generated_values_count_as_present():
+    """mqtt_counter, time_str and communication_status are ours, not the pump's."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message({"Client_Name": "ThermIQ_x", "d0": 21, "time": "2026-08-12 20:00:00"})
+    )
+    for key in ("mqtt_counter", "time_str", "communication_status"):
+        assert hp.supports(key) is True, key
+
+
+async def test_nothing_is_supported_before_the_first_message():
+    hp, _ = _make_heatpump()
+    assert hp.supports("r00") is False
+    assert hp.supports("evu") is False
