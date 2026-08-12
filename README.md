@@ -234,6 +234,26 @@ Run it standalone if you would rather not run Home Assistant, or install it as a
 Assistant add-on and it appears in your sidebar. See it with
 `docker run --rm -p 8080:8080 -e THERMIQ_DEMO=1 thermiq-bridge`.
 
+**As an add-on**, on Home Assistant OS or Supervised: *Settings &rarr; Add-ons &rarr; Add-on
+store &rarr; the three-dot menu &rarr; Repositories*, add
+`https://github.com/larsablixth/thermiq-bridge`, then install **ThermIQ Bridge** and set
+`mqtt_host`, `node` and `id`. Set `read_only: true` if you would rather it could never write
+to the pump.
+
+Three things worth knowing before you choose it over the dashboard card:
+
+- **It is a sidebar panel, not a dashboard card.** It cannot sit among your other cards - an
+  `iframe` card pointed at it returns 401, because ingress only authenticates when Home
+  Assistant's own frontend opens the panel. Full page in the sidebar, or nothing.
+- **Add-ons need Supervisor.** Home Assistant Container and Core installs cannot use this
+  route; the card is the only option there.
+- **It is young.** The add-on was not installable at all until 12 August 2026, and the first
+  half hour of real runtime found a keepalive bug (v0.1.4). The aarch64 build - which is what
+  a Raspberry Pi runs - is cross-compiled and published but has not yet been run by anyone.
+
+What it does buy you is a widget with no custom-element machinery behind it: no card module to
+load, so none of the browser-side failure modes that come with one.
+
 #### ThermIQ-USB Support
 Tom R has created [a Node-RED flow](https://github.com/tomrosenback/thermiq-node-red-homeassistant-config) converting the previous version, ThermIQ-USB, to use the same MQTT messages making it compatible with this integration.
 
