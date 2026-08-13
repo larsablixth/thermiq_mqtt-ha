@@ -187,6 +187,10 @@ class ThermiqWidgetCard extends HTMLElement {
       this.appendChild(this._root);
     } else {
       const card = document.createElement("ha-card");
+      // On the card, not on the containing block: padding on the containing
+      // block would not inset absolutely positioned children at all, because
+      // their containing block is its padding box.
+      card.style.padding = "16px";
       card.appendChild(this._root);
       this.appendChild(card);
     }
@@ -234,6 +238,48 @@ class ThermiqWidgetCard extends HTMLElement {
     const tpl = document.createElement("template");
     tpl.innerHTML = msg.result;
     morphChildren(this._root, tpl.content);
+    if (!this._fitted) {
+      this._fitted = true;
+      requestAnimationFrame(() => this._fit());
+    }
+  }
+
+  /* Shrink the box to the drawing, so the drawing can be centred.
+   *
+   * Every element in the template is absolutely positioned, and an absolutely
+   * positioned child contributes nothing to its container's intrinsic size -
+   * so the drawing's width is invisible to CSS. `width: max-content` and
+   * friends all resolve to zero here. The only way to know how wide it is, is
+   * to look. Measured once, after the first render has laid out.
+   *
+   * Deliberately not a constant: it comes out of whatever the template drew,
+   * so re-vendoring a wider template does not silently mis-centre it. */
+  _fit() {
+    const box = this._root.getBoundingClientRect();
+    if (!box.width) return;
+    let left = Infinity;
+    let right = 0;
+    for (const el of this._root.querySelectorAll("*")) {
+      const style = getComputedStyle(el);
+      if (style.position !== "absolute") continue;
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      const rect = el.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      left = Math.min(left, rect.left - box.left);
+      right = Math.max(right, rect.right - box.left);
+    }
+    if (!isFinite(left) || right <= 0) return;
+
+    // width = left + right, not right: the drawing does not start at the box's
+    // left edge, it starts `left` in. Centring a box of width `right` would
+    // leave the drawing off-centre by left/2 - measured at 14px, which is
+    // visible. Padding the box by `left` on the right instead makes it
+    // symmetric about the drawing, so auto margins centre what you can see.
+    const width = Math.ceil(left + right);
+    if (width >= box.width) return; // no room to centre into
+    this._root.style.width = width + "px";
+    this._root.style.marginLeft = "auto";
+    this._root.style.marginRight = "auto";
   }
 
   connectedCallback() {
