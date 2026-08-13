@@ -166,6 +166,13 @@ class ThermiqWidgetCard extends HTMLElement {
 
   async _init() {
     this.style.display = "block";
+    // The template positions every element absolutely against its container,
+    // so the card has to be that container. Without this the nearest
+    // positioned ancestor is hui-view-container and the widget lays itself out
+    // against the whole view - drawing over the header, wherever the card
+    // happens to sit. It only looked right as an entities row because
+    // something in that chain happened to be positioned.
+    this.style.position = "relative";
     this._root = document.createElement("div");
     this.appendChild(this._root);
     try {
