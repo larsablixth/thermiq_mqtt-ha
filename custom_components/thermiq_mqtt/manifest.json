@@ -1,6 +1,9 @@
 {
   "domain": "thermiq_mqtt",
   "name": "ThermIQ MQTT Integration",
+  "after_dependencies": [
+    "lovelace"
+  ],
   "codeowners": [
     "@thermiq"
   ],
