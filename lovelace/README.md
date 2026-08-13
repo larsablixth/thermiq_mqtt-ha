@@ -61,6 +61,15 @@ files to copy into `www/`, and no dashboard resource to add by hand.
    entity_prefix: thermiq_mqtt_myid
    ```
 
+   The widget draws itself inside an `ha-card`, so it picks up the background,
+   corner radius and elevation of the active theme like any other card. If you
+   are nesting it inside a card of your own and do not want two:
+
+   ```yaml
+   type: custom:thermiq-widget-card
+   card: false
+   ```
+
    **Not as a row inside an `entities` card.** It renders there, but only
    sometimes: Home Assistant builds rows with `createRowElement`, and when a
    custom element isn't defined yet it substitutes an error placeholder and

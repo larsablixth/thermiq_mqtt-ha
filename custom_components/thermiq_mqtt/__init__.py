@@ -62,7 +62,7 @@ PLATFORMS = [
 # hand. Bumping CARD_VERSION busts the browser cache for the card.
 FRONTEND_URL_BASE = f"/{DOMAIN}_frontend"
 CARD_FILENAME = "thermiq-widget-card.js"
-CARD_VERSION = "1.3.0"
+CARD_VERSION = "1.4.0"
 CARD_URL = f"{FRONTEND_URL_BASE}/{CARD_FILENAME}"
 FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 
