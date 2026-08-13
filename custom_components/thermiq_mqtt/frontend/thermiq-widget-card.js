@@ -166,15 +166,30 @@ class ThermiqWidgetCard extends HTMLElement {
 
   async _init() {
     this.style.display = "block";
+    this._root = document.createElement("div");
     // The template positions every element absolutely against its container,
-    // so the card has to be that container. Without this the nearest
+    // so something here has to be that container. Without it the nearest
     // positioned ancestor is hui-view-container and the widget lays itself out
     // against the whole view - drawing over the header, wherever the card
     // happens to sit. It only looked right as an entities row because
     // something in that chain happened to be positioned.
-    this.style.position = "relative";
-    this._root = document.createElement("div");
-    this.appendChild(this._root);
+    //
+    // No padding here: an absolutely positioned child resolves against the
+    // padding *box*, which includes the padding, so padding would add height
+    // without insetting anything. The template already insets itself - its
+    // outer div starts at left:15px and its topmost pill at top:14px.
+    this._root.style.position = "relative";
+    // Wrapped in an ha-card so it reads as a card - background, radius and
+    // elevation from the active theme, like every other card in the view.
+    // `card: false` opts out, for anyone nesting this inside a card of their
+    // own and not wanting two.
+    if (this._config.card === false) {
+      this.appendChild(this._root);
+    } else {
+      const card = document.createElement("ha-card");
+      card.appendChild(this._root);
+      this.appendChild(card);
+    }
     try {
       this._template = await loadTemplate(this._config.template_url);
       const prefix = this._config.entity_prefix || DEFAULT_PREFIX;
