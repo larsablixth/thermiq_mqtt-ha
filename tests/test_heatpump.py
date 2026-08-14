@@ -243,3 +243,97 @@ async def test_nothing_is_supported_before_the_first_message():
     hp, _ = _make_heatpump()
     assert hp.supports("r00") is False
     assert hp.supports("evu") is False
+
+
+# --- EVU corner cases, from mocked payloads -----------------------------
+#
+# EVU is the one control that does not travel as a numbered register: the
+# pump echoes it under its own name, and the integration keys it as "evu".
+# That makes it the register most likely to break in a way the numbered
+# ones cannot, so the cases below pin both directions of the wire.
+# Requested by @ThermIQ (fork issue #28).
+
+
+@pytest.mark.parametrize("value", [0, 1])
+async def test_evu_round_trips_through_a_payload(value):
+    """Both states arrive, and both are readable as themselves."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {"Client_Name": "ThermIQ_x", "app_info": "ThermIQ-room2 2.68", "EVU": value}
+        )
+    )
+    assert hp._hpstate["evu"] == value
+
+
+async def test_evu_zero_is_a_value_not_an_absence():
+    """The corner case worth having: 0 is a state, not a missing register.
+
+    Capability detection keys off whether the pump ever mentioned EVU. A
+    falsy value must not read as "this pump cannot do EVU" - that would
+    make the control vanish exactly when the block is released.
+    """
+    hp, _ = _make_heatpump()
+    await hp.message_received(_message({"Client_Name": "ThermIQ_x", "EVU": 0}))
+    assert hp._hpstate["evu"] == 0
+    assert hp.supports("evu") is True
+
+
+async def test_evu_tracks_a_change_across_messages():
+    hp, _ = _make_heatpump()
+    for value in (1, 0, 1):
+        await hp.message_received(_message({"Client_Name": "ThermIQ_x", "EVU": value}))
+        assert hp._hpstate["evu"] == value
+        assert hp.supports("evu") is True
+
+
+async def test_evu_key_is_case_insensitive():
+    """Keys are lowercased on the way in, so 'evu' and 'EVU' are one register."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(_message({"Client_Name": "ThermIQ_x", "evu": 1}))
+    assert hp._hpstate["evu"] == 1
+    assert hp.supports("evu") is True
+
+
+async def test_evu_arriving_as_a_string_is_stored_verbatim():
+    """A quoted value is not coerced. The switch reads it through int(), so
+    it still resolves; this records that the raw type reaches the state."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(_message({"Client_Name": "ThermIQ_x", "EVU": "1"}))
+    assert hp._hpstate["evu"] == "1"
+    assert int(hp._hpstate["evu"]) == 1
+
+
+async def test_d300_is_not_the_evu_capability():
+    """d300 appears in the debug log as EVU's decimal alias, but it is only
+    a log label: a payload carrying d300 does not make EVU drivable."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(_message({"Client_Name": "ThermIQ_x", "d300": 1}))
+    assert hp._hpstate.get("evu") is None
+    assert hp.supports("evu") is False
+
+
+@pytest.mark.parametrize("value", [0, 1])
+async def test_evu_write_publishes_both_states_to_the_set_topic(value):
+    """Releasing the block has to reach the pump as surely as setting it."""
+    hp, _ = _make_writable_heatpump()
+    with patch(
+        "custom_components.thermiq_mqtt.heatpump.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as publish:
+        await hp.send_mqtt_reg("heatpump_evu_block", value, 0xFFFF)
+        publish.assert_called_once()
+        topic, payload = publish.call_args[0][1], publish.call_args[0][2]
+        assert topic == hp._set_topic
+        assert json.loads(payload) == {"EVU": value}
+
+
+@pytest.mark.parametrize("value", [2, -1])
+async def test_evu_write_refuses_anything_that_is_not_a_boolean(value):
+    hp, _ = _make_writable_heatpump()
+    with patch(
+        "custom_components.thermiq_mqtt.heatpump.mqtt.async_publish",
+        new=AsyncMock(),
+    ) as publish:
+        await hp.send_mqtt_reg("heatpump_evu_block", value, 0xFFFF)
+        publish.assert_not_called()
