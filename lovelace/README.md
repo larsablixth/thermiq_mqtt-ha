@@ -206,6 +206,21 @@ hot-water charging cycle visually (forced flows, staged 63 °C tank
 color) without touching the pump — handy for testing the card or showing
 it off. Without the helper, demo mode is simply off.
 
+## Editing the template
+
+`heatpump_widget.j2` is rendered twice: by Home Assistant's Jinja2 here, and
+by a small hand-written compiler in
+[thermiq-bridge](https://github.com/larsablixth/thermiq-bridge), which turns it
+into C so the add-on can draw the same widget with no Python at all. That
+compiler implements a deliberate subset, and its test suite renders both and
+compares them byte for byte.
+
+So an expression that is perfectly good Jinja2 can still be un-vendorable. The
+one to know: clamp with `([lo, value, hi]|sort)[1]`, which the compiler
+supports and which the colour macros already use throughout — not `|min` or
+`|max`, which it does not. If you add a construct it cannot handle, its
+`Generated sources are current` job fails with the reason.
+
 ## Compatibility note
 
 The widget reads the integration's sensors and binary sensors, plus
