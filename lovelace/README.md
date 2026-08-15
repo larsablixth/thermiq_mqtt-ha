@@ -201,6 +201,21 @@ template:
              and is_state('binary_sensor.thermiq_mqtt_vp1_hotwaterproduction_on','off') }}
 ```
 
+**Pool temperature.** The pool branch takes its temperature from
+`sensor.…_supply_shunt_t` — register `r0b`, the pump's own shunt-circuit
+sensor, which the widget labels *Pool temp actual* and prints in the caption
+beside the target. The pool body and the pipe leaving the pool are drawn in
+that colour; the pipe returning to the pool is drawn warmer by however much
+the pump gives up across the exchanger, capped at 3 K, since a pool circuit
+runs high flow and low delta.
+
+So **fit the probe in the pool and the drawing follows** — nothing here needs
+changing. Until then it reads wherever the sensor actually sits, which on a
+stock install is the boiler room, and the caption shows that number honestly
+rather than pretending it is pool water. If `r0b` has no reading at all the
+colour falls back to the curve-2 target, which is a setpoint: it says where
+the water is heading rather than where it is.
+
 **Demo mode.** Create `input_boolean.hpviz_demo` and toggle it to stage a
 hot-water charging cycle visually (forced flows, staged 63 °C tank
 color) without touching the pump — handy for testing the card or showing
