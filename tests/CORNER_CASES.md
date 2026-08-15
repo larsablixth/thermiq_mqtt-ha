@@ -203,3 +203,11 @@ anyway.
 Everything here assumes a flat map of scalars. A nested value would be stored
 as a `dict` or `list` and reach `int()` at the entity, which would log and
 show `unknown` — survivable, but untested because it is not known to occur.
+
+**8. Are register writes applied per-packet, or should they be batched?**
+Asked by @mahagr: if several `/write` packets arrive in a row, does the
+interface apply all of them, or should the integration coalesce a set of
+values into one request? Today every `number`/`switch` change publishes its
+own message, so a user dragging three sliders sends three packets. If the
+interface prefers one, the write path wants a small queue. Related: can `EVU`
+and `INDR_T` be written freely and independently, as separate control wires?
