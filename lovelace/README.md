@@ -209,21 +209,6 @@ however fast it runs. The refrigerant loop is deliberately left fixed: the
 compressor is single-speed, so a rate there would be invented rather than
 measured.
 
-**Pool or buffer tank.** The pump drives Curve 2 but cannot say what is on
-the end of it, so the integration provides a selector —
-`select.…_secondary_circuit`, with `pool` and `buffer`. It is a drawing
-choice, not a register: the temperatures are identical either way, and only
-the vessel at the end of the branch changes.
-
-- **pool** (default) — a wide basin with moving water, fed along the bottom
-  pipe and returning along the top.
-- **buffer** — an upright insulated tank, stratified hottest at the top,
-  taking the feed at its upper port and giving up the return at its lower
-  one, which is how an accumulator tank is actually plumbed.
-
-Both occupy the same space, so switching moves nothing else in the drawing.
-The choice survives a restart.
-
 **Pool temperature.** The pool branch takes its temperature from
 `sensor.…_supply_shunt_t` — register `r0b`, the pump's own shunt-circuit
 sensor, which the widget labels *Pool temp actual* and prints in the caption
