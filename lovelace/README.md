@@ -201,6 +201,14 @@ template:
              and is_state('binary_sensor.thermiq_mqtt_vp1_hotwaterproduction_on','off') }}
 ```
 
+**Flow speed.** The arrows move at the speed the pumps report. Each circuit
+carries a CSS multiplier taken from its own pump — `--vpw` from the supply
+pump, `--vpb` from the brine pump — and every duration and chevron delay in
+that circuit is expressed against it, so an arrow trail stays evenly spaced
+however fast it runs. The refrigerant loop is deliberately left fixed: the
+compressor is single-speed, so a rate there would be invented rather than
+measured.
+
 **Pool or buffer tank.** The pump drives Curve 2 but cannot say what is on
 the end of it, so the integration provides a selector —
 `select.…_secondary_circuit`, with `pool` and `buffer`. It is a drawing
