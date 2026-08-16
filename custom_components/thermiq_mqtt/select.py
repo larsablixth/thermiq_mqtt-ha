@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -35,11 +36,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up the ThermIQ select entities for a config entry."""
     heatpump = hass.data[DOMAIN].heatpumps[config_entry.data["id_name"]]
-    entities = [
+    entities: list[SelectEntity] = [
         ThermIQSelect(heatpump, key)
         for key in reg_id
         if reg_id[key][FIELD_REGTYPE] == "select_input"
     ]
+    entities.append(ThermIQSecondaryCircuit(heatpump))
     async_add_entities(entities)
 
 
@@ -121,3 +123,47 @@ class ThermIQSelect(SelectEntity):
         if snapshot != getattr(self, "_last_snapshot", None):
             self._last_snapshot = snapshot
             self.async_write_ha_state()
+
+
+class ThermIQSecondaryCircuit(SelectEntity, RestoreEntity):
+    """What Curve 2 actually heats, for the widget to draw.
+
+    Not a register. The pump drives a second circuit and cannot say what is
+    on the end of it - a pool on one installation, a buffer tank feeding
+    floor heating on another. The temperatures are identical either way, so
+    this only decides which picture the widget draws.
+
+    Kept as a plain entity rather than a config-flow option so it can be
+    changed from the dashboard and read by a template, and restored across
+    restarts so the choice sticks.
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = False
+    _attr_icon = "mdi:pipe-disconnected"
+    _attr_options = ["pool", "buffer"]
+
+    def __init__(self, heatpump: HeatPump) -> None:
+        self._heatpump = heatpump
+        self.entity_id = f"select.{heatpump._domain}_{heatpump._id}_secondary_circuit"
+        self._attr_unique_id = "uid-" + self.entity_id
+        self._attr_name = "Secondary circuit"
+        self._attr_current_option = "pool"
+
+    @property
+    def available(self) -> bool:
+        """Always: it is a drawing preference, not a reading from the pump."""
+        return True
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self._attr_options:
+            _LOGGER.warning("Unknown option %s for %s", option, self.entity_id)
+            return
+        self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is not None and last.state in self._attr_options:
+            self._attr_current_option = last.state
