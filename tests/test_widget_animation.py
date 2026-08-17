@@ -66,15 +66,15 @@ def test_arrowheads_move_at_the_speed_of_the_dashes_they_sit_in():
     correct until someone watched it with the pump stopped.
     """
     dashes = _dash_durations()
-    mismatched = [
-        (path, dashes[path], duration)
-        for path, duration in _chevron_durations()
-        if dashes.get(path) != duration
-    ]
-    assert not mismatched, "arrowhead and dash speeds differ:\n" + "\n".join(
-        f"  {path}\n    line: {line}\n    head: {head}"
-        for path, line, head in mismatched
-    )
+    mismatched = []
+    for path, duration in _chevron_durations():
+        if dashes.get(path) != duration:
+            mismatched.append(
+                f"  {path}\n    line: {dashes[path]}\n    head: {duration}"
+            )
+
+    report = "arrowhead and dash speeds differ:\n" + "\n".join(mismatched)
+    assert not mismatched, report
 
 
 def test_water_flows_scale_with_their_pump_and_refrigerant_does_not():
@@ -86,18 +86,13 @@ def test_water_flows_scale_with_their_pump_and_refrigerant_does_not():
     water flow that does not scale at all, is the bug this catches.
     """
     durations = _dash_durations()
-    well_formed = re.compile(
-        r"^(?:[\d.]+s|calc\([\d.]+s \* 100 / var\(--vp[wb]\)\))$"
-    )
+    well_formed = re.compile(r"^(?:[\d.]+s|calc\([\d.]+s \* 100 / var\(--vp[wb]\)\))$")
     for path, duration in durations.items():
         assert well_formed.match(duration), f"{path}: malformed duration {duration}"
 
-    paced_by = {
-        var: [p for p, d in durations.items() if f"var(--{var})" in d]
-        for var in ("vpw", "vpb")
-    }
-    assert paced_by["vpw"], "no flow is paced by the supply pump"
-    assert paced_by["vpb"], "no flow is paced by the brine pump"
+    values = list(durations.values())
+    assert any("var(--vpw)" in d for d in values), "no flow paced by the supply pump"
+    assert any("var(--vpb)" in d for d in values), "no flow paced by the brine pump"
 
     # The refrigerant loop is the only thing that may be unscaled, and it is
     # three paths inside the cabinet. If that count grows, a water flow has
