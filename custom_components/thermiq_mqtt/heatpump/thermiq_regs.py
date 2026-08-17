@@ -245,9 +245,13 @@ id_names: dict[str, list[str]] = {
         "Kühlung Temperatur",
     ],
     "supply_shunt_t": [
-        # r0b is the shunt-circuit supply sensor - in this installation the
-        # boiler-room sensor the pump regulates the pool circuit against
-        "Pool temp actual",
+        # r0b is the shunt-circuit supply sensor, downstream of the mixing
+        # valve: measured on a shunt group serving floor heating, it tracks
+        # integral2_curve_min/max/slope and not the water feeding the shunt.
+        # What it is plumbed to differs by installation - a pool via an
+        # expansion card on one, a floor loop on another - so it is named for
+        # where it sits, not for what happens to be on the end of it.
+        "Shunt supply temp.",
         "Framledn.temp., shunt",
         "Menovesi lämpötila, shuntti",
         "Tur temp., shunt",
@@ -593,7 +597,11 @@ id_names: dict[str, list[str]] = {
         "Mischer Kurve max",
     ],
     "integral2_curve_target": [
-        "Pool temp target",
+        # r40 is the Curve 2 menu's target row. Whether it drives anything is
+        # unsettled: on a shunt group serving floor heating the supply
+        # temperature followed curve min/max/slope and ignored this. Named for
+        # the register it is rather than for an effect not yet demonstrated.
+        "Curve 2 target",
         "Shunt kurva, bör",
         "Shuntin käyrä, haluttu",
         "Shunt Kurve, bør",
