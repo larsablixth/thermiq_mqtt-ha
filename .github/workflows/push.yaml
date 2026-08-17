@@ -34,9 +34,18 @@ jobs:
             python-version: "3.12"
         # pinned so a new black release cannot turn CI red on its own
         - run: python3 -m pip install black==25.11.0
-        # only the tests this PR adds - reformatting the whole
-        # codebase would be a large unrelated diff
+        # Blocking, but only over tests/ - those files are already formatted,
+        # so keeping them that way costs nothing. Reformatting the whole
+        # codebase would be a large unrelated diff.
         - run: black --check tests/
+        # Reporting only, never blocking: --diff prints exactly what black
+        # would change in the rest of the tree, so the drift is visible in the
+        # log without anyone being forced to act on it. Drop continue-on-error
+        # once a reformatting pass has happened, and the check starts to mean
+        # something.
+        - name: Report formatting drift in the rest of the tree
+          run: black --check --diff .
+          continue-on-error: true
 
   test:
     runs-on: "ubuntu-latest"
