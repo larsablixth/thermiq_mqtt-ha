@@ -8,7 +8,10 @@ The whole machine is drawn as one SVG: cabinet, brine loop, evaporator,
 scroll compressor, condenser, hot-water tank, 3-way valve, radiator
 circuit and (optionally) a pool / second heating circuit.
 
-![The widget rendered with demo values](../docs/heatpump_widget.svg)
+![The ThermIQ animated heat-pump widget](../docs/heatpump_widget.png)
+
+*A screenshot from a live installation, with the pump idle — when it runs,
+the flows animate and the compressor turns.*
 
 Everything on screen tells the truth about the machine:
 
