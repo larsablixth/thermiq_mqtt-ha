@@ -213,9 +213,15 @@ measured.
 `sensor.…_supply_shunt_t` — register `r0b`, the pump's own shunt-circuit
 sensor, which the widget labels *Pool temp actual* and prints in the caption
 beside the target. The pool body and the pipe leaving the pool are drawn in
-that colour; the pipe returning to the pool is drawn warmer by however much
-the pump gives up across the exchanger, capped at 3 K, since a pool circuit
-runs high flow and low delta.
+that colour; the pipe returning to the pool is drawn warmer by the whole
+supply-to-return drop the pump is currently producing, clamped to 0–40 K so
+that a missing or absurd reading cannot throw the colour off the scale.
+
+It takes the whole drop deliberately. An earlier version capped the rise at
+3 K on the reasoning that a pool circuit runs high flow and low delta — but
+whatever the flow does on the pool side, the exchanger can only pass on what
+the heat pump gives it, and at 3 K the two pipes were very nearly the same
+colour, which is the one thing the pair is there to show.
 
 So **fit the probe in the pool and the drawing follows** — nothing here needs
 changing. Until then it reads wherever the sensor actually sits, which on a
