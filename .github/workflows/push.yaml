@@ -5,6 +5,8 @@ on:
     branches:
       - master
       - dev
+  # Also run on pull requests, so problems are visible before a merge rather
+  # than after it
   pull_request:
 
 jobs:
@@ -29,18 +31,24 @@ jobs:
         - uses: "actions/checkout@v4"
         - uses: "actions/setup-python@v5"
           with:
-            python-version: "3.x"
-        # Pinned: an unpinned black turns CI red on its own the day a new
-        # release changes its formatting, with no commit to blame.
-        - run: python3 -m pip install "black==25.11.0"
-        # --check reports instead of reformatting into a runner that is then
-        # thrown away; --diff shows exactly what it would change.
-        #
-        # Not blocking yet, deliberately: every file in this repository would
-        # be reformatted today, so making this red would mean a reformatting
-        # commit nobody asked for. Drop this line once that pass has happened
-        # and the job starts meaning something.
-        - run: black --check --diff .
-          continue-on-error: true
+            python-version: "3.12"
+        # pinned so a new black release cannot turn CI red on its own
+        - run: python3 -m pip install black==25.11.0
+        # only the tests this PR adds - reformatting the whole
+        # codebase would be a large unrelated diff
+        - run: black --check tests/
 
-  
+  test:
+    runs-on: "ubuntu-latest"
+    name: Run tests
+    steps:
+        - uses: "actions/checkout@v4"
+        - uses: "actions/setup-python@v5"
+          with:
+            python-version: "3.13"
+        - name: Install dependencies
+          run: |
+            python3 -m pip install --upgrade pip
+            python3 -m pip install -r requirements_test.txt
+        - name: Run tests
+          run: python3 -m pytest tests/ -v
