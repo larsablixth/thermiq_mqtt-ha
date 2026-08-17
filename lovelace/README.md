@@ -214,8 +214,8 @@ measured.
 
 **Pool temperature.** The pool branch takes its temperature from
 `sensor.…_supply_shunt_t` — register `r0b`, the pump's own shunt-circuit
-sensor, which the widget labels *Pool temp actual* and prints in the caption
-beside the target. The pool body and the pipe leaving the pool are drawn in
+sensor, which the integration calls *Shunt supply temp.* and which the widget
+prints in the caption beside the Curve 2 target. The pool body and the pipe leaving the pool are drawn in
 that colour; the pipe returning to the pool is drawn warmer by the whole
 supply-to-return drop the pump is currently producing, clamped to 0–40 K so
 that a missing or absurd reading cannot throw the colour off the scale.
@@ -256,7 +256,7 @@ supports and which the colour macros already use throughout — not `|min` or
 ## Compatibility note
 
 The widget reads the integration's sensors and binary sensors, plus
-`number.…_integral2_curve_target` for the pool-target colour and
+`number.…_integral2_curve_target` for the fallback colour and
 `switch.…_heatpump_evu_block` for the EVU badge. All of these exist on this
 fork. Against **upstream** ThermIQ, which still uses the `input_*` platforms,
 those two references fall back to defaults and everything else works
