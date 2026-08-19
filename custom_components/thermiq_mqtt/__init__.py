@@ -15,7 +15,14 @@ from homeassistant.const import (
 from homeassistant.helpers.recorder import session_scope, get_instance as recorder_get_instance
 from homeassistant.components.recorder.statistics import async_change_statistics_unit
 from homeassistant.helpers import entity_registry as er
-from homeassistant.components.recorder.db_schema import StatisticsMeta, Statistics, StatisticsShortTerm
+from homeassistant.components.recorder.db_schema import (
+    StatisticsMeta,
+    Statistics,
+    StatisticsShortTerm,
+    States,
+    StatesMeta,
+)
+from homeassistant.components import persistent_notification
 
 from .const import (
     DOMAIN,
@@ -35,17 +42,15 @@ from .heatpump.thermiq_regs import (
     reg_id,
 )
 
-# from .automation import setup_automations
-from .input_number import setup_input_numbers
-from .input_select import setup_input_selects
-from .input_boolean import setup_input_booleans
-
 _LOGGER = logging.getLogger(__name__)
 SERVICE_SET_VALUE = "set_value"
 
 PLATFORMS = [
     "sensor",
     "binary_sensor",
+    "number",
+    "select",
+    "switch",
 ]
 
 # The dashboard widget ships inside the integration, so installing it is the
@@ -532,8 +537,18 @@ async def _async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
         else:
             _LOGGER.info("State class migrations completed successfully")
 
+        # Run input_* -> number/select/switch platform migration
+        success3 = await async_migrate_input_platforms(hass, config_entry)
 
-        if success1 and success2:
+        if not success3:
+            _LOGGER.error(
+                "Migration of input_* platforms failed - history may remain "
+                "split across the old and new entity ids"
+            )
+        else:
+            _LOGGER.info("input_* platform migration completed successfully")
+
+        if success1 and success2 and success3:
             # Mark migration as complete even if some entities failed
             # (they might not exist yet, or be created later)
             migration_data = {
@@ -551,6 +566,294 @@ async def _async_migrate_entry(hass: HomeAssistant, config_entry) -> bool:
         return True  # Continue setup even if migration fails
 
 
+# ---------------------------------------------------------------------------
+# 3.3.0 platform migration:
+#     input_number.*  -> number.*
+#     input_select.*  -> select.*
+#     input_boolean.* -> switch.*
+#
+# Up to 3.1.x the integration hijacked Home Assistant's own input_* helper
+# platforms. Each helper was built with
+#
+#     config[CONF_ID] = f"{heatpump._domain}_{heatpump._id}_{key}"
+#     entity          = CustomInputNumber.from_yaml(config)
+#
+# giving entity ids of the form
+#
+#     input_number.{DOMAIN}_{id_name}_{key}     on platform "input_number"
+#
+# 3.3.0 replaced these with real NumberEntity/SelectEntity/SwitchEntity on this
+# integration's own platform:
+#
+#     number.{DOMAIN}_{id_name}_{key}           on platform "thermiq_mqtt"
+#     unique_id = "uid-" + entity_id
+#
+# The object_id is identical on both sides; only the domain prefix changes, so
+# the mapping is a pure domain swap with no name matching involved.
+#
+# The entity registry cannot perform this rename for us: an entity_id's domain
+# must match its platform's domain, and the stale rows belong to the input_*
+# integrations rather than to this one. So the recorder rows are repointed
+# directly and the orphaned registry entries are then dropped.
+# ---------------------------------------------------------------------------
+
+PLATFORM_MIGRATION_MAP = {
+    "input_number": "number",
+    "input_select": "select",
+    "input_boolean": "switch",
+}
+
+
+async def async_migrate_input_platforms(
+    hass: HomeAssistant, config_entry: ConfigEntry
+) -> bool:
+    """
+    Carry history and long-term statistics from the pre-3.3.0 input_* helper
+    entities over to the number/select/switch entities that replaced them, then
+    remove the orphaned input_* registry entries.
+
+    Idempotent: once the old rows are gone the scan finds nothing and returns
+    True immediately, so re-running is harmless.
+
+    Returns:
+        bool: True if migration succeeded or was not needed, False on a
+              critical failure. Per-entity problems are logged and do not fail
+              the migration as a whole.
+    """
+    id_name = config_entry.data[CONF_ID]
+    entity_reg = er.async_get(hass)
+    recorder = recorder_get_instance(hass)
+
+    prefixes = {
+        f"{old_domain}.{DOMAIN}_{id_name}_": new_domain
+        for old_domain, new_domain in PLATFORM_MIGRATION_MAP.items()
+    }
+
+    old_entity_ids: set[str] = set()
+
+    # 1. Entities visible in the registry.
+    for entry in list(entity_reg.entities.values()):
+        if any(entry.entity_id.startswith(p) for p in prefixes):
+            old_entity_ids.add(entry.entity_id)
+
+    # 2. Recorder-only orphans. A helper created without a unique_id never
+    #    entered the registry, yet still owns states_meta rows holding its
+    #    history - upstream's input_boolean.py is exactly this case, its
+    #    unique_id registration being commented out. Without this pass their
+    #    history would be silently left behind.
+    try:
+        orphans = await recorder.async_add_executor_job(
+            _discover_recorder_entities, hass, tuple(prefixes)
+        )
+        old_entity_ids.update(orphans)
+    except Exception as e:  # noqa: BLE001 - discovery must not block setup
+        _LOGGER.warning(
+            "Could not scan recorder for orphaned input_* entities: %s", str(e)
+        )
+
+    if not old_entity_ids:
+        _LOGGER.debug(
+            "No pre-3.3.0 input_* entities found for ThermIQ [%s], nothing to migrate",
+            id_name,
+        )
+        return True
+
+    renames: list[tuple[str, str]] = []
+    for old_entity_id in sorted(old_entity_ids):
+        old_domain, object_id = old_entity_id.split(".", 1)
+        new_domain = PLATFORM_MIGRATION_MAP[old_domain]
+        renames.append((old_entity_id, f"{new_domain}.{object_id}"))
+
+    _LOGGER.info(
+        "Migrating %s pre-3.3.0 input_* entities for ThermIQ [%s] to number/select/switch",
+        len(renames),
+        id_name,
+    )
+
+    try:
+        migrated = await recorder.async_add_executor_job(
+            _migrate_recorder_rows, hass, renames
+        )
+    except Exception as e:  # noqa: BLE001 - migration must never block setup
+        _LOGGER.error(
+            "Could not migrate recorder rows for ThermIQ [%s]: %s",
+            id_name,
+            str(e),
+            exc_info=True,
+        )
+        return False
+
+    # Drop the orphaned registry entries only after the recorder rows have been
+    # repointed - otherwise a failure above would strand the history under an
+    # entity_id with no registry entry left to find it by.
+    removed = 0
+    for old_entity_id, _new_entity_id in renames:
+        if entity_reg.async_get(old_entity_id) is None:
+            continue
+        try:
+            entity_reg.async_remove(old_entity_id)
+            removed += 1
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.warning(
+                "Could not remove stale registry entry %s: %s", old_entity_id, str(e)
+            )
+
+    _LOGGER.info(
+        "ThermIQ [%s]: repointed %s recorder entities, removed %s stale registry entries",
+        id_name,
+        migrated,
+        removed,
+    )
+
+    _notify_entity_id_changes(hass, id_name, renames)
+    return True
+
+
+def _discover_recorder_entities(
+    hass: HomeAssistant, prefixes: tuple[str, ...]
+) -> list[str]:
+    """
+    Find entity_ids in states_meta matching any of the old input_* prefixes.
+
+    Filtering happens in Python rather than via SQL LIKE on purpose: an
+    entity_id prefix such as "input_number.thermiq_mqtt_myhp_" is full of
+    underscores, and LIKE treats "_" as a single-character wildcard, so the
+    pattern would match far more than intended. states_meta holds one row per
+    entity, so reading the id column is cheap.
+
+    Runs inside a recorder executor job.
+    """
+    with session_scope(hass=hass, read_only=True) as session:
+        all_ids = session.execute(select(StatesMeta.entity_id)).scalars().all()
+
+    return [eid for eid in all_ids if any(eid.startswith(p) for p in prefixes)]
+
+
+def _migrate_recorder_rows(hass: HomeAssistant, renames: list[tuple[str, str]]) -> int:
+    """
+    Repoint recorder rows from the old entity_ids onto the new ones.
+
+    Two cases per entity:
+
+    * new row absent  - the states_meta/statistics_meta row is renamed in
+      place, carrying all of its history with it.
+    * new row present - the user already ran 3.3.0, so history is split across
+      two rows. The old rows' data is repointed onto the new metadata_id and
+      the emptied old row deleted, merging the two series.
+
+    Runs inside a recorder executor job, opening its own session as the other
+    migrations in this module do.
+
+    Returns the number of entities that had at least one row migrated.
+    """
+    migrated = 0
+
+    with session_scope(hass=hass, read_only=False) as session:
+        for old_entity_id, new_entity_id in renames:
+            touched = False
+
+            # --- recorded states -------------------------------------------
+            old_meta = session.execute(
+                select(StatesMeta).where(StatesMeta.entity_id == old_entity_id)
+            ).scalar_one_or_none()
+
+            if old_meta is not None:
+                new_meta = session.execute(
+                    select(StatesMeta).where(StatesMeta.entity_id == new_entity_id)
+                ).scalar_one_or_none()
+
+                if new_meta is None:
+                    session.execute(
+                        update(StatesMeta)
+                        .where(StatesMeta.metadata_id == old_meta.metadata_id)
+                        .values(entity_id=new_entity_id)
+                    )
+                    _LOGGER.debug(
+                        "Renamed states %s -> %s", old_entity_id, new_entity_id
+                    )
+                else:
+                    session.execute(
+                        update(States)
+                        .where(States.metadata_id == old_meta.metadata_id)
+                        .values(metadata_id=new_meta.metadata_id)
+                    )
+                    session.delete(old_meta)
+                    _LOGGER.debug(
+                        "Merged states %s into %s", old_entity_id, new_entity_id
+                    )
+                touched = True
+
+            # --- long term statistics --------------------------------------
+            # Normally a no-op: input_number helpers carry no state_class and
+            # so have no long-term statistics. Handled anyway for installs that
+            # added one by hand via customize.
+            old_stat = session.execute(
+                select(StatisticsMeta).where(
+                    StatisticsMeta.statistic_id == old_entity_id
+                )
+            ).scalar_one_or_none()
+
+            if old_stat is not None:
+                new_stat = session.execute(
+                    select(StatisticsMeta).where(
+                        StatisticsMeta.statistic_id == new_entity_id
+                    )
+                ).scalar_one_or_none()
+
+                if new_stat is None:
+                    session.execute(
+                        update(StatisticsMeta)
+                        .where(StatisticsMeta.id == old_stat.id)
+                        .values(statistic_id=new_entity_id)
+                    )
+                    _LOGGER.debug(
+                        "Renamed statistics %s -> %s", old_entity_id, new_entity_id
+                    )
+                else:
+                    for table in (Statistics, StatisticsShortTerm):
+                        session.execute(
+                            update(table)
+                            .where(table.metadata_id == old_stat.id)
+                            .values(metadata_id=new_stat.id)
+                        )
+                    session.delete(old_stat)
+                    _LOGGER.debug(
+                        "Merged statistics %s into %s", old_entity_id, new_entity_id
+                    )
+                touched = True
+
+            if touched:
+                migrated += 1
+
+    return migrated
+
+
+def _notify_entity_id_changes(
+    hass: HomeAssistant, id_name: str, renames: list[tuple[str, str]]
+) -> None:
+    """
+    Tell the user which entity ids moved.
+
+    History and statistics follow automatically, but automations, scripts,
+    dashboards and templates cannot be rewritten safely from inside the
+    integration - they live in user-authored YAML and Lovelace storage.
+    Listing the mapping is what turns a silent break into a quick
+    find-and-replace.
+    """
+    lines = "\n".join(f"- `{old}` &rarr; `{new}`" for old, new in renames)
+    persistent_notification.async_create(
+        hass,
+        (
+            f"ThermIQ-MQTT **{id_name}** has replaced its `input_*` helper "
+            f"entities with proper `number`/`select`/`switch` entities.\n\n"
+            f"History and long-term statistics were moved across "
+            f"automatically. Any **automations, scripts, dashboards or "
+            f"templates** still referencing the old ids need updating:\n\n"
+            f"{lines}"
+        ),
+        title="ThermIQ-MQTT: entities renamed",
+        notification_id=f"{DOMAIN}_{id_name}_input_platform_migration",
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -574,28 +877,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     rld = entry.add_update_listener(reload_entry)
     entry.async_on_unload(rld)
 
-    async def finish_setup() -> None:
-        """Create the input_* helper entities, then start MQTT."""
-        await setup_input_numbers(heatpump)
-        await setup_input_selects(heatpump)
-        await setup_input_booleans(heatpump)
-        if hass.is_running:
-            # HA is already up (e.g. the integration was just added via the
-            # UI) - EVENT_HOMEASSISTANT_STARTED has fired and never will
-            # again, so subscribe immediately
-            await heatpump.setup_mqtt()
-        else:
-            # Wait for hass to start before subscribing
-            hass.bus.async_listen_once(
-                EVENT_HOMEASSISTANT_STARTED, handle_hass_started
-            )
-
-    hass.async_create_task(finish_setup())
-
-    # Load the sensor/binary_sensor platforms and await them so the entities
-    # are fully set up before this entry is marked done (avoids races where
-    # consumers access the platform data before it is ready)
+    # Load all platforms (sensor, binary_sensor, number, select, switch) and
+    # await them so the entities are fully set up before this entry is marked
+    # done (avoids races where consumers access the platform data too early)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Subscribe to MQTT
+    if hass.is_running:
+        # HA is already up (e.g. the integration was just added via the UI) -
+        # EVENT_HOMEASSISTANT_STARTED has fired and never will again, so
+        # subscribe immediately
+        await heatpump.setup_mqtt()
+    else:
+        # Wait for hass to start before subscribing
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, handle_hass_started)
 
     return True
 
@@ -652,6 +947,10 @@ class ThermIQWorker:
             {"action": "add", "heatpump": config_entry.data[CONF_ID]},
         )
         return heatpump
+
+    def get_entry(self, config_entry: ConfigEntry):
+        """Get heatpump for a config entry."""
+        return self._heatpumps[config_entry.data[CONF_ID]]
 
     def remove_entry(self, config_entry: ConfigEntry):
         """Remove entry."""
