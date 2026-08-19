@@ -173,10 +173,10 @@ aio_energy_management:
 
 # Misc
 #### Automations
-No setup of automations is needed. You can use the normal "input_number" services to change a value in the heatpump. For example:
+No setup of automations is needed. You can use the normal "number" services to change a value in the heatpump. For example:
 
-```service: input_number.set_value
-data: {"entity_id": "input_number.thermiq_mqtt_vp1_indoor_requested_t", "value":20}
+```service: number.set_value
+data: {"entity_id": "number.thermiq_mqtt_vp1_indoor_requested_t", "value":20}
 ```
 
 #### Available data
