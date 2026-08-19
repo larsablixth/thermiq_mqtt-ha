@@ -136,9 +136,6 @@ class HeatPump:
         self._id = entry.data[CONF_ID]
         self._id_reg = {}
         self.unsubscribe_callback = None
-        # Generated input_number/input_select/input_boolean entities,
-        # tracked so they can be removed when the entry is unloaded
-        self._helper_entities = []
 
         # Create reverse lookup dictionary (id_reg->reg_number)
         # Registers start as None (unknown) until the first MQTT message;
@@ -195,16 +192,10 @@ class HeatPump:
 
 
     async def async_reset(self):
-        """Reset this heatpump: unsubscribe MQTT and remove generated helpers."""
+        """Reset this heatpump: unsubscribe from MQTT."""
         if self.unsubscribe_callback is not None:
             self.unsubscribe_callback()
             self.unsubscribe_callback = None
-        for entity in list(self._helper_entities):
-            try:
-                await entity.async_remove(force_remove=True)
-            except Exception as err:  # entity may already be gone
-                _LOGGER.debug("Could not remove entity: %s", err)
-        self._helper_entities = []
         return True
 
     @property
@@ -234,7 +225,7 @@ class HeatPump:
 
     # ### ##################################################################
     # Write specific value_id with data, value_id will be translated to register number.
-    # Default service used by input_number automations
+    # Default service used by the number/select/switch entities
 
     async def send_mqtt_reg(self, register_id, value, bitmask) -> None:
         """Service to send a message."""
