@@ -245,6 +245,130 @@ async def test_nothing_is_supported_before_the_first_message():
     assert hp.supports("evu") is False
 
 
+# --- EVU is gated on the interface, not on the echo ---------------------
+#
+# ThermIQ, fork issue #37, with the firmware source in front of them:
+#
+#   "EVU is always available in all modern FW regardless if it is supported
+#    towards HP or not."
+#   "INDR_T is only available if HW supports it, ThermIQ-room and
+#    ThermIQ-room2 support, ThermIQ-mqtt does not."
+#
+# So the two registers v3.5.5 treated alike are not alike at all. INDR_T
+# describes the hardware; EVU dates the firmware. The pump that proves it is
+# one nobody involved owns - a plain ThermIQ-MQTT on recent firmware - which
+# is why the original measurement (189 entities, exactly 3 gated) looked
+# right: that pump reports ThermIQ-mqtt 2.22 and is too old to send EVU.
+
+
+async def test_modern_plain_mqtt_sends_evu_and_still_cannot_drive_it():
+    """The regression #37 was reopened for.
+
+    Recent firmware on plain ThermIQ-MQTT hardware echoes EVU although the
+    pump cannot act on it. Keying on the echo hands the user back exactly the
+    dead switch the issue set out to remove.
+    """
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {
+                "Client_Name": "ThermIQ_x",
+                "app_info": "ThermIQ-mqtt 2.90",
+                "d0": 21,
+                "EVU": 0,
+            }
+        )
+    )
+    assert hp._hpstate["evu"] == 0
+    assert hp.supports("evu") is False
+
+
+async def test_a_room_cannot_drive_evu_either():
+    """EVU is Room2-only; a ThermIQ-Room echoing it does not make it drivable."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {
+                "Client_Name": "ThermIQ_x",
+                "app_info": "ThermIQ-room 2.68",
+                "EVU": 0,
+                "INDR_T": 21.1,
+            }
+        )
+    )
+    assert hp.supports("evu") is False
+    # INDR_T still answers to the echo, and a Room does support it
+    assert hp.supports("indr_t") is True
+
+
+async def test_a_room2_drives_evu_before_it_has_echoed_one():
+    """The interface decides, so the control does not wait for a first EVU."""
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {"Client_Name": "ThermIQ_x", "app_info": "ThermIQ-room2 2.68", "d0": 17}
+        )
+    )
+    assert hp.supports("evu") is True
+
+
+async def test_the_interface_match_ignores_case():
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message({"Client_Name": "ThermIQ_x", "app_info": "THERMIQ-ROOM2 2.68"})
+    )
+    assert hp.supports("evu") is True
+
+
+async def test_an_unknown_interface_keeps_the_echo_rule():
+    """Fail open: an interface ThermIQ ships later must not lose the control.
+
+    Both directions, because falling back to the echo has to stay evidence
+    rather than become a blanket yes.
+    """
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {"Client_Name": "ThermIQ_x", "app_info": "ThermIQ-room3 3.01", "EVU": 1}
+        )
+    )
+    assert hp.supports("evu") is True
+
+    hp2, _ = _make_heatpump()
+    await hp2.message_received(
+        _message(
+            {"Client_Name": "ThermIQ_x", "app_info": "ThermIQ-room3 3.01", "d0": 17}
+        )
+    )
+    assert hp2.supports("evu") is False
+
+
+async def test_a_malformed_app_info_falls_back_to_the_echo():
+    """Anything not "<interface> <version>" leaves the old rule in charge."""
+    for app_info in (12345, "", "   "):
+        hp, _ = _make_heatpump()
+        await hp.message_received(
+            _message({"Client_Name": "ThermIQ_x", "app_info": app_info, "EVU": 1})
+        )
+        assert hp.supports("evu") is True, app_info
+
+
+async def test_indr_t_is_not_interface_gated():
+    """A Room2 that has not sent INDR_T cannot drive it - the echo governs.
+
+    The mirror of the EVU case: gating INDR_T on the interface too would be
+    the same mistake in the other direction.
+    """
+    hp, _ = _make_heatpump()
+    await hp.message_received(
+        _message(
+            {"Client_Name": "ThermIQ_x", "app_info": "ThermIQ-room2 2.68", "EVU": 0}
+        )
+    )
+    assert hp.supports("evu") is True
+    assert hp.supports("indr_t") is False
+
+
 # --- EVU corner cases, from mocked payloads -----------------------------
 #
 # EVU is the one control that does not travel as a numbered register: the
