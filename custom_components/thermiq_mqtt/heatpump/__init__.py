@@ -38,6 +38,17 @@ _LOGGER = logging.getLogger(__name__)
 AVAILABILITY_TIMEOUT = timedelta(seconds=120)
 AVAILABILITY_CHECK_INTERVAL = timedelta(seconds=30)
 
+# The interfaces whose capabilities are known, as app_info reports them
+# (lowercased). Anything outside this set is something ThermIQ has shipped
+# since, and is deliberately not decided from this table - see supports().
+KNOWN_INTERFACES = frozenset({"thermiq-mqtt", "thermiq-room", "thermiq-room2"})
+
+# Registers whose presence in /data does not prove the hardware can drive
+# them, mapped to the known interfaces that can. See HeatPump.supports.
+INTERFACE_GATED: dict[str, frozenset[str]] = {
+    "evu": frozenset({"thermiq-room2"}),
+}
+
 # Register types whose min/max fields are true numeric bounds. For
 # generated_input_boolean the same table slot holds the bitmask, so it is
 # validated separately (only 0/1 allowed).
@@ -159,11 +170,11 @@ class HeatPump:
         # message is processed at all.
         received.update(("mqtt_counter", "time_str", "communication_status"))
 
-        # What the pump actually sends is what it can actually do. EVU and the
-        # room-sensor setpoint are the clear cases - a ThermIQ-Room2 echoes
-        # them back in /data, a plain ThermIQ-MQTT never mentions them and
-        # cannot act on them either - but the rule needs no list of models to
-        # apply, and no lookup table to keep current when new interfaces ship.
+        # What the pump sends is mostly what it can do: the room-sensor
+        # setpoint is the clear case - ThermIQ confirmed in #37 that INDR_T
+        # is present only where the hardware supports it - and the rule needs
+        # no list of models to keep current when new interfaces ship. EVU is
+        # the exception; INTERFACE_GATED and supports() carry that story.
         #
         # Only ever grows. A register that appears in one message and not the
         # next stays supported, so an intermittently reported capability
@@ -224,24 +235,53 @@ class HeatPump:
             < AVAILABILITY_TIMEOUT.total_seconds()
         )
 
+    def _interface(self) -> str | None:
+        """This pump's hardware interface, lowercased, from app_info.
+
+        app_info is "<interface> <firmware>", e.g. "ThermIQ-room2 2.68".
+        ThermIQ generates it from their build system (#37), so unlike the
+        MQTT node name no user can edit it. None until the pump has sent an
+        app_info in that shape.
+        """
+        app_info = self._hpstate.get("app_info")
+        if not isinstance(app_info, str):
+            return None
+        head = app_info.split()
+        return head[0].lower() if head else None
+
     def supports(self, register: str) -> bool:
-        """True if this pump has ever sent this register.
+        """True if this pump can actually act on this register.
 
-        The interfaces differ in what they can drive: EVU is ThermIQ-Room2
-        only, and the room-sensor setpoint needs a Room or a Room2. Offering
-        those controls on hardware that cannot act on them gives the user a
-        switch that publishes, is ignored, and springs back - which reads as a
-        broken integration rather than as unsupported hardware.
+        Offering a control the hardware cannot drive gives the user a switch
+        that publishes, is ignored, and springs back - which reads as a broken
+        integration rather than as unsupported hardware.
 
-        Asking the data rather than the model avoids two traps. The MQTT node
-        name is chosen by the user during setup, so it says nothing about the
-        hardware behind it; and app_info is a name rather than a capability, so
-        it needs a lookup table that goes stale the day a new interface ships.
-        What arrives in /data is what the pump will actually act on.
+        The usual evidence is what arrives in /data: what the pump sends is
+        what it will act on, it needs no table of models to keep current, and
+        a renamed MQTT node cannot fool it. ThermIQ confirmed in #37 that
+        INDR_T behaves this way - present only where the hardware supports it.
+
+        EVU is why INTERFACE_GATED exists. ThermIQ, same issue: "EVU is always
+        available in all modern FW regardless if it is supported towards HP or
+        not." Its presence therefore dates the firmware rather than describing
+        the hardware, and keying on it would hand a plain ThermIQ-MQTT the
+        dead switch back. For those registers the interface string decides.
+
+        Only an interface in KNOWN_INTERFACES decides anything. When app_info
+        is missing, malformed, or names something ThermIQ has shipped since,
+        the echo decides after all: a new interface must not lose a working
+        control for being absent from a table, which is the failure mode that
+        argued against keying on the model in the first place. Firmware too
+        old to send EVU is still answered correctly either way.
 
         Before the first message this returns False for everything, which
         costs nothing: `available` is False then anyway.
         """
+        interfaces = INTERFACE_GATED.get(register)
+        if interfaces is not None:
+            interface = self._interface()
+            if interface in KNOWN_INTERFACES:
+                return interface in interfaces
         return register in self._echoed
 
     async def _availability_watchdog(self, _now: datetime) -> None:
