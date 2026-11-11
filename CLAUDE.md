@@ -72,10 +72,11 @@ at screenshots does not find collisions, measuring does — render the template
 with `tools/render_widget_html.py` and read `getBoundingClientRect()` in a
 headless browser, per scenario.
 
-**The drawing needs 357px of card inner width.** `_fit()` centres it but never
-scales, taking an early `return` when there is no room — so on a 375pt iPhone
-(327px) and a 393pt one (345px) it sits left-aligned with dead space. Cosmetic
-today; anything that widens the drawing makes it structural.
+**The drawing needs 357px of card inner width.** Narrower than that - a
+375pt iPhone gives 327px, a 393pt one 345px - the card scales it down with CSS
+`zoom` to fit (`_layout()` in the card), and re-fits on resize or rotation. It
+never scales up. So a wider drawing no longer overflows on phones, but it does
+get smaller there: everything wider shrinks every badge's text with it.
 
 ## Two files have a downstream consumer
 
