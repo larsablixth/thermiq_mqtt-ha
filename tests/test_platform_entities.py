@@ -10,7 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from custom_components.thermiq_mqtt.heatpump import HeatPump
 from custom_components.thermiq_mqtt.heatpump.thermiq_regs import FIELD_REGNUM, reg_id
 from custom_components.thermiq_mqtt.number import ThermIQNumber
-from custom_components.thermiq_mqtt.select import ThermIQSelect
+from custom_components.thermiq_mqtt.select import (
+    ThermIQSelect,
+    ThermIQTopologySelect,
+)
 from custom_components.thermiq_mqtt.switch import ThermIQSwitch
 
 
@@ -312,3 +315,64 @@ def test_silence_still_wins_over_capability():
     """Supporting a register does not make a silent pump available."""
     hp = _make_heatpump(has_data=False, echoed={"evu"})
     assert ThermIQSwitch(hp, "heatpump_evu_block").available is False
+
+
+# --- Topology select (#80) ---------------------------------------------
+
+
+def _topology(key, has_data=True):
+    hp = _make_heatpump(has_data=has_data)
+    entity = ThermIQTopologySelect(hp, key)
+    entity.async_write_ha_state = MagicMock()
+    return hp, entity
+
+
+def test_topology_defaults_draw_todays_picture():
+    _, main = _topology("main_circuit")
+    _, secondary = _topology("secondary_circuit")
+    assert main.entity_id == "select.thermiq_mqtt_vp1_main_circuit"
+    assert secondary.entity_id == "select.thermiq_mqtt_vp1_secondary_circuit"
+    assert main.options == ["direct", "buffer"]
+    assert secondary.options == ["none", "pool", "floor"]
+    assert main.current_option == "direct"
+    assert secondary.current_option == "none"
+
+
+def test_topology_is_available_while_the_pump_is_silent():
+    _, entity = _topology("main_circuit", has_data=False)
+    assert entity.available is True
+
+
+async def test_topology_select_never_writes_to_the_pump():
+    hp, entity = _topology("secondary_circuit")
+    await entity.async_select_option("floor")
+    assert entity.current_option == "floor"
+    hp.send_mqtt_reg.assert_not_awaited()
+    entity.async_write_ha_state.assert_called_once()
+
+
+async def test_topology_rejects_unknown_option():
+    _, entity = _topology("main_circuit")
+    await entity.async_select_option("radiators")
+    assert entity.current_option == "direct"
+    entity.async_write_ha_state.assert_not_called()
+
+
+async def test_topology_restores_last_choice():
+    _, entity = _topology("main_circuit")
+    entity.async_get_last_state = AsyncMock(return_value=MagicMock(state="buffer"))
+    await entity.async_added_to_hass()
+    assert entity.current_option == "buffer"
+
+
+async def test_topology_ignores_a_restored_value_it_no_longer_offers():
+    _, entity = _topology("secondary_circuit")
+    entity.async_get_last_state = AsyncMock(return_value=MagicMock(state="shunt"))
+    await entity.async_added_to_hass()
+    assert entity.current_option == "none"
+
+
+def test_topology_names_follow_the_pump_language():
+    hp = _make_heatpump()
+    hp._langid = 1  # se
+    assert ThermIQTopologySelect(hp, "main_circuit").name == "Huvudkrets"

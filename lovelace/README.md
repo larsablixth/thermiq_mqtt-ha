@@ -204,6 +204,15 @@ template:
              and is_state('binary_sensor.thermiq_mqtt_vp1_hotwaterproduction_on','off') }}
 ```
 
+**Topology selectors.** Two configuration selects describe what is plumbed
+around the pump, which the pump itself cannot report:
+`select.thermiq_mqtt_vp1_main_circuit` (`direct` | `buffer`) and
+`select.thermiq_mqtt_vp1_secondary_circuit` (`none` | `pool` | `floor`).
+They are set by you, never written to the pump, and remembered across
+restarts. The defaults describe what the widget draws today, and the widget
+does not read them yet - they are the groundwork for the buffer and floor
+drawings discussed in #80.
+
 **Flow speed.** The arrows move at the speed the pumps report. Each circuit
 carries a CSS multiplier taken from its own pump — `--vpw` from the supply
 pump, `--vpb` from the brine pump — and every duration and chevron delay in
