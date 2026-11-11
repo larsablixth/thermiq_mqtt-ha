@@ -72,11 +72,13 @@ at screenshots does not find collisions, measuring does — render the template
 with `tools/render_widget_html.py` and read `getBoundingClientRect()` in a
 headless browser, per scenario.
 
-**The drawing needs 357px of card inner width.** Narrower than that - a
-375pt iPhone gives 327px, a 393pt one 345px - the card scales it down with CSS
-`zoom` to fit (`_layout()` in the card), and re-fits on resize or rotation. It
-never scales up. So a wider drawing no longer overflows on phones, but it does
-get smaller there: everything wider shrinks every badge's text with it.
+**The drawing needs 285px of card inner width, and grows downward, not
+sideways.** It used to need 357px because the pool sat to the right of its heat
+exchanger; since #80 it sits underneath, so the drawing fits a 320pt phone at
+full size. Keep it that way: anything new (buffer, emitter loops) goes below
+the pump, not beside it. Below the measured width the card still scales the
+drawing down with CSS `zoom` (`_layout()` in the card) and re-fits on resize or
+rotation, but that is the fallback, not the layout.
 
 ## Two files have a downstream consumer
 
