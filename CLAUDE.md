@@ -74,8 +74,8 @@ headless browser, per scenario.
 
 **The drawing needs 285px of card inner width, and grows downward, not
 sideways.** It used to need 357px because the pool sat to the right of its heat
-exchanger; since #80 it sits underneath, so the drawing fits a 320pt phone at
-full size. Keep it that way: anything new (buffer, emitter loops) goes below
+exchanger; since #80 it sits underneath, so the drawing fits a 375pt phone (327px
+of card) at full size; only the smallest, 320pt, still shrink it slightly. Keep it that way: anything new (buffer, emitter loops) goes below
 the pump, not beside it. Below the measured width the card still scales the
 drawing down with CSS `zoom` (`_layout()` in the card) and re-fits on resize or
 rotation, but that is the fallback, not the layout.
