@@ -25,7 +25,7 @@
  * browser caches it against the ?v= in the import URL.
  */
 
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 const DEFAULT_URL = "/thermiq_mqtt_frontend/heatpump_widget.j2";
 const DEFAULT_PREFIX = "thermiq_mqtt_vp1"; // integration domain + entry id
 
@@ -244,13 +244,14 @@ class ThermiqWidgetCard extends HTMLElement {
     }
   }
 
-  /* Shrink the box to the drawing, so the drawing can be centred.
+  /* Measure the drawing once, then fit it to whatever width the card has.
    *
    * Every element in the template is absolutely positioned, and an absolutely
    * positioned child contributes nothing to its container's intrinsic size -
    * so the drawing's width is invisible to CSS. `width: max-content` and
    * friends all resolve to zero here. The only way to know how wide it is, is
-   * to look. Measured once, after the first render has laid out.
+   * to look. Measured once, after the first render has laid out, and before
+   * any scaling is applied.
    *
    * Deliberately not a constant: it comes out of whatever the template drew,
    * so re-vendoring a wider template does not silently mis-centre it. */
@@ -275,18 +276,59 @@ class ThermiqWidgetCard extends HTMLElement {
     // leave the drawing off-centre by left/2 - measured at 14px, which is
     // visible. Padding the box by `left` on the right instead makes it
     // symmetric about the drawing, so auto margins centre what you can see.
-    const width = Math.ceil(left + right);
-    if (width >= box.width) return; // no room to centre into
+    this._drawingWidth = Math.ceil(left + right);
+    this._layout();
+
+    // Phones rotate and dashboards change column count, so the room the card
+    // has is not fixed. Re-fit whenever it changes; the drawing itself was
+    // measured above and does not need measuring again.
+    if (!this._resizeObserver && typeof ResizeObserver !== "undefined") {
+      this._resizeObserver = new ResizeObserver(() => this._layout());
+    }
+    if (this._resizeObserver) this._resizeObserver.observe(this);
+  }
+
+  /* The width the drawing may use: the content box of whatever holds it. */
+  _available() {
+    const parent = this._root.parentElement;
+    if (!parent) return 0;
+    const style = getComputedStyle(parent);
+    return (
+      parent.clientWidth -
+      (parseFloat(style.paddingLeft) || 0) -
+      (parseFloat(style.paddingRight) || 0)
+    );
+  }
+
+  /* Centre the drawing when it fits; scale it down when it does not.
+   *
+   * It used to only centre, and give up when there was no room - so on a
+   * 375pt iPhone (327px of card) the 357px drawing hung off the right edge.
+   * Now it shrinks to the card instead, never grows past its natural size.
+   *
+   * `zoom` rather than `transform: scale()`: zoom scales the layout box too,
+   * so the card's height shrinks with the drawing. A transform paints smaller
+   * but keeps the full-size box, leaving a gap under the drawing that would
+   * have to be cancelled with a negative margin. */
+  _layout() {
+    const width = this._drawingWidth;
+    const avail = this._available();
+    if (!width || !avail || avail === this._lastAvail) return;
+    this._lastAvail = avail;
+    const scale = Math.min(1, avail / width);
     this._root.style.width = width + "px";
     this._root.style.marginLeft = "auto";
     this._root.style.marginRight = "auto";
+    this._root.style.zoom = scale < 1 ? String(scale) : "";
   }
 
   connectedCallback() {
     if (this._started && this._template) this._subscribe();
+    if (this._resizeObserver) this._resizeObserver.observe(this);
   }
 
   disconnectedCallback() {
+    if (this._resizeObserver) this._resizeObserver.disconnect();
     const p = this._unsubPromise;
     this._unsubPromise = null;
     if (p) p.then((unsub) => unsub()).catch(() => {});
