@@ -215,19 +215,22 @@ async def test_tibber_reply_is_normalised(hass):
 
 
 async def test_blueprint_installed_into_config(hass, tmp_path):
-    """The integration copies its blueprint where HA looks for blueprints,
-    rewrites it only when it changed, and survives a read-only config."""
+    """The integration copies its blueprints where HA looks for blueprints,
+    rewrites one only when it changed, and survives a read-only config."""
     from custom_components.thermiq_mqtt import (
         _install_blueprints,
         async_install_blueprints,
     )
 
-    target = tmp_path / "blueprints" / "automation" / "thermiq_mqtt" / BLUEPRINT.name
-    assert _install_blueprints(str(tmp_path)) == [BLUEPRINT.name]
+    shipped = sorted(p.name for p in BLUEPRINT.parent.glob("*.yaml"))
+    assert {"hotwater_cheap_hours.yaml", "floor_preheat.yaml"} <= set(shipped)
+    folder = tmp_path / "blueprints" / "automation" / "thermiq_mqtt"
+    target = folder / BLUEPRINT.name
+    assert _install_blueprints(str(tmp_path)) == shipped
     assert target.read_bytes() == BLUEPRINT.read_bytes()
     # Unchanged: not written again
     assert _install_blueprints(str(tmp_path)) == []
-    # An older copy is replaced by the shipped one
+    # An older copy is replaced by the shipped one, the others left alone
     target.write_text("old")
     assert _install_blueprints(str(tmp_path)) == [BLUEPRINT.name]
     assert target.read_bytes() == BLUEPRINT.read_bytes()

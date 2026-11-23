@@ -84,8 +84,8 @@ today; anything that widens the drawing makes it structural.
 the content differs. They are how beta functions ship: nothing runs until a
 user creates an automation from one. Each keeps its decision in a single
 template variable so `tests/` can render it with HA's own template engine.
-`blueprints/` at the repo root is **not** shipped (the floor pre-heat
-experiment lives there).
+The two share their price templates (Tibber/Nordpool/Entso-e → `[[ts,
+price]]`); a test keeps them identical.
 
 ## Two files have a downstream consumer
 
@@ -102,7 +102,7 @@ falls back.
 ## Tests and CI
 
 ```bash
-python3 -m pytest tests -v     # 174 tests
+python3 -m pytest tests -v     # 175 tests
 python3 -m mypy                # config in mypy.ini
 black --check .
 ```

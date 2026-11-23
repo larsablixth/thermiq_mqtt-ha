@@ -206,8 +206,8 @@ aio_energy_management:
 #### Hot water in cheap hours (beta)
 A blueprint, installed with the integration, that lets the hot water tank drop to 35 °C and tops it up in the cheapest hours instead of right after showers. See [docs/hotwater_cheap_hours.md](docs/hotwater_cheap_hours.md).
 
-#### Pre-heating the floor in cheap hours (experimental)
-A blueprint that raises the indoor target ahead of expensive hours, but only when the price gap pays for the lost efficiency. See [docs/price_preheat.md](docs/price_preheat.md).
+#### Pre-heating the floor in cheap hours (beta)
+A blueprint, installed with the integration, that stores heat in a concrete floor slab ahead of expensive hours, but only when the price gap pays for the lost efficiency. See [docs/floor_preheat.md](docs/floor_preheat.md).
 
 
 # Misc

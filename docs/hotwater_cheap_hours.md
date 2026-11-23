@@ -42,10 +42,6 @@ cooler for longer also loses less heat. On SE3 prices 2023–2026 with
 Vattenfall's time tariff, moving 8 kWh/day of hot water electricity to the
 cheapest hours was worth roughly **800–950 kr per winter**.
 
-**If you have a home battery** that already runs the house from cheap night
-power, most of that saving is already being made by the battery. What
-remains is the smaller tank loss and less battery cycling.
-
 ## Legionella: keep the heat pump's own protection on
 
 A tank allowed down to 35 °C spends long periods at 25–45 °C, the range in
