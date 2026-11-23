@@ -77,6 +77,16 @@ scales, taking an early `return` when there is no room — so on a 375pt iPhone
 (327px) and a 393pt one (345px) it sits left-aligned with dead space. Cosmetic
 today; anything that widens the drawing makes it structural.
 
+## Bundled blueprints
+
+`custom_components/thermiq_mqtt/blueprints/*.yaml` are copied into
+`<config>/blueprints/automation/thermiq_mqtt/` at setup, rewritten only when
+the content differs. They are how beta functions ship: nothing runs until a
+user creates an automation from one. Each keeps its decision in a single
+template variable so `tests/` can render it with HA's own template engine.
+The two share their price templates (Tibber/Nordpool/Entso-e → `[[ts,
+price]]`); a test keeps them identical.
+
 ## Two files have a downstream consumer
 
 `heatpump_widget.j2` and `heatpump/thermiq_regs.py` are vendored by
@@ -92,7 +102,7 @@ falls back.
 ## Tests and CI
 
 ```bash
-python3 -m pytest tests -v     # 134 tests
+python3 -m pytest tests -v     # 175 tests
 python3 -m mypy                # config in mypy.ini
 black --check .
 ```

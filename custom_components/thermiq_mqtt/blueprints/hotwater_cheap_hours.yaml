@@ -1,0 +1,274 @@
+blueprint:
+  name: ThermIQ – hot water in cheap hours (beta)
+  description: >
+    Lets the hot water tank drop to a low temperature (35 °C by default)
+    before the heat pump reheats it, and tops the tank up in the cheapest
+    hours of the next 24 hours instead. After a few showers the tank simply
+    waits for cheap power, unless it really falls to the low temperature.
+
+    It works by changing the heat pump's hot water **start** temperature:
+    low most of the time, just below the stop temperature in cheap hours.
+    The stop temperature is left alone.
+
+    **Keep the heat pump's legionella function on** (interval at most 7
+    days, legionella stop temperature at least 60 °C). A tank that sits at
+    35–45 °C is in the range where legionella bacteria grow.
+
+    Prices: Tibber, Nordpool (HACS) or Entso-e; hourly and 15-minute prices
+    both work. See docs/hotwater_cheap_hours.md.
+  domain: automation
+  homeassistant:
+    # The variables action updating outer-scope variables (Tibber path)
+    min_version: 2025.4.0
+  source_url: https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/custom_components/thermiq_mqtt/blueprints/hotwater_cheap_hours.yaml
+  input:
+    price_source:
+      name: Price source
+      default: tibber
+      selector:
+        select:
+          options:
+            - label: Tibber
+              value: tibber
+            - label: Nordpool (HACS)
+              value: nordpool
+            - label: Entso-e
+              value: entsoe
+    price_sensor:
+      name: Price sensor (Nordpool / Entso-e only)
+      description: Not used with Tibber, which is asked for prices directly.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    start_entity:
+      name: Hot water start temperature
+      default: number.thermiq_mqtt_vp1_hotwater_start_t
+      selector:
+        entity:
+          domain: number
+    stop_entity:
+      name: Hot water stop temperature
+      default: number.thermiq_mqtt_vp1_hotwater_stop_t
+      selector:
+        entity:
+          domain: number
+    low_start:
+      name: Lowest accepted temperature
+      description: >
+        Outside cheap hours the pump reheats only when the tank falls to
+        this. 35 °C is enough for a quick shower.
+      default: 35
+      selector:
+        number:
+          min: 30
+          max: 55
+          step: 1
+          unit_of_measurement: "°C"
+          mode: box
+    cheap_hours:
+      name: Cheap hours per day
+      description: >
+        How many of the cheapest hours in the next 24 hours may top up the
+        tank. Long enough to heat the tank from the low temperature.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 12
+          step: 1
+          unit_of_measurement: h
+          mode: box
+    reheat_margin:
+      name: Top-up margin
+      description: >
+        In cheap hours the start temperature is set this far below the stop
+        temperature, so the tank is topped up even if only a little was used.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 15
+          step: 1
+          unit_of_measurement: "°C"
+          mode: box
+    peak_fee:
+      name: Extra grid fee in peak hours
+      description: >
+        If your grid fee is higher at certain times (e.g. Vattenfall's time
+        tariff: +0.46 SEK/kWh weekdays 06–22, November–March), enter the
+        difference here so cheap hours are ranked on what you actually pay.
+        Same unit as the prices (e.g. SEK/kWh). 0 = flat grid fee.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 0.01
+          mode: box
+    peak_start_hour:
+      name: Peak hours start
+      default: 6
+      selector:
+        number:
+          min: 0
+          max: 23
+          step: 1
+          mode: box
+    peak_end_hour:
+      name: Peak hours end
+      default: 22
+      selector:
+        number:
+          min: 1
+          max: 24
+          step: 1
+          mode: box
+    peak_months:
+      name: Peak months
+      default: ["1", "2", "3", "11", "12"]
+      selector:
+        select:
+          multiple: true
+          options:
+            - { label: January, value: "1" }
+            - { label: February, value: "2" }
+            - { label: March, value: "3" }
+            - { label: April, value: "4" }
+            - { label: May, value: "5" }
+            - { label: June, value: "6" }
+            - { label: July, value: "7" }
+            - { label: August, value: "8" }
+            - { label: September, value: "9" }
+            - { label: October, value: "10" }
+            - { label: November, value: "11" }
+            - { label: December, value: "12" }
+
+mode: restart
+
+triggers:
+  - trigger: time_pattern
+    minutes: "/15"
+    seconds: 30
+  - trigger: homeassistant
+    event: start
+
+variables:
+  price_source: !input price_source
+  price_sensor: !input price_sensor
+  start_entity: !input start_entity
+  stop_entity: !input stop_entity
+  low_start: !input low_start
+  cheap_hours: !input cheap_hours
+  reheat_margin: !input reheat_margin
+  peak_fee: !input peak_fee
+  peak_start_hour: !input peak_start_hour
+  peak_end_hour: !input peak_end_hour
+  peak_months: !input peak_months
+  # [[unix timestamp, price], ...] from Nordpool or Entso-e attributes.
+  # Tibber fills tibber_slots in the actions instead.
+  attr_slots: >-
+    {%- set ns = namespace(s=[]) -%}
+    {%- if price_source == 'nordpool' -%}
+      {%- for i in (state_attr(price_sensor, 'raw_today') or [])
+                 + (state_attr(price_sensor, 'raw_tomorrow') or []) -%}
+        {%- if i.value is number -%}
+          {%- set ns.s = ns.s + [[as_timestamp(i.start), i.value]] -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- elif price_source == 'entsoe' -%}
+      {%- for i in state_attr(price_sensor, 'prices') or [] -%}
+        {%- if i.price is number -%}
+          {%- set ns.s = ns.s + [[as_timestamp(i.time), i.price]] -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+    {{ ns.s }}
+  tibber_slots: []
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ price_source == 'tibber' }}"
+    then:
+      - action: tibber.get_prices
+        data:
+          start: "{{ (now() - timedelta(hours=24)).isoformat() }}"
+          end: "{{ (now() + timedelta(hours=36)).isoformat() }}"
+        response_variable: tibber_reply
+        continue_on_error: true
+      # Normalise the reply (first home) to [[timestamp, price], ...]
+      - variables:
+          tibber_slots: >-
+            {%- set ns = namespace(s=[]) -%}
+            {%- set homes = (tibber_reply | default({})).get('prices', {}) -%}
+            {%- for home in homes.values() -%}
+              {%- if loop.first -%}
+                {%- for i in home -%}
+                  {%- if i.price is number -%}
+                    {%- set ns.s = ns.s + [[as_timestamp(i.start_time), i.price]] -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.s }}
+  # The decision lives in this one template so it can be tested on its own
+  # (tests/test_hotwater_blueprint.py). Result: cheap, wait, or unknown.
+  - variables:
+      decision: >-
+        {%- set slots = (tibber_slots if price_source == 'tibber' else attr_slots)
+                        | sort(attribute=0) -%}
+        {%- set t = as_timestamp(now()) -%}
+        {%- set ns = namespace(cur=none, costs=[], used=0, limit=none) -%}
+        {%- set months = peak_months | map('int') | list -%}
+        {%- for s in slots -%}
+          {%- set nxt = slots[loop.index][0] if not loop.last
+                        else s[0] + (s[0] - slots[loop.index0 - 1][0] if loop.length > 1 else 3600) -%}
+          {%- set lt = as_local(as_datetime(s[0])) -%}
+          {%- set peak = lt.weekday() < 5 and lt.month in months
+                         and peak_start_hour | int <= lt.hour < peak_end_hour | int -%}
+          {%- set ns.costs = ns.costs + [[s[0], nxt - s[0],
+                             s[1] + (peak_fee | float(0) if peak else 0)]] -%}
+          {%- if s[0] <= t < nxt -%}{%- set ns.cur = ns.costs[-1] -%}{%- endif -%}
+        {%- endfor -%}
+        {%- if ns.cur is none -%}
+          unknown
+        {%- else -%}
+          {#- 24 h of known prices containing now: from now forward, extended
+              backwards when tomorrow's prices are not out yet -#}
+          {%- set last_end = ns.costs[-1][0] + ns.costs[-1][1] -%}
+          {%- set w_end = [last_end, ns.cur[0] + 86400] | min -%}
+          {%- set w_start = [w_end - 86400, ns.cur[0]] | min -%}
+          {%- set window = ns.costs | selectattr(0, '>=', w_start)
+                           | selectattr(0, '<', w_end) | sort(attribute=2) | list -%}
+          {%- for c in window -%}
+            {%- if ns.limit is none -%}
+              {%- set ns.used = ns.used + c[1] -%}
+              {%- if ns.used >= cheap_hours | float(3) * 3600 -%}
+                {%- set ns.limit = c[2] -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if ns.limit is none or ns.cur[2] <= ns.limit -%}
+            cheap
+          {%- else -%}
+            wait
+          {%- endif -%}
+        {%- endif -%}
+      new_start: >-
+        {%- set low = low_start | float(35) -%}
+        {%- set stop = states(stop_entity) | float(0) -%}
+        {%- if decision == 'cheap' and stop > low -%}
+          {{ [stop - reheat_margin | float(3), low] | max }}
+        {%- else -%}
+          {{ low }}
+        {%- endif -%}
+  # Only write when the value changes: every write is a register write.
+  - condition: template
+    value_template: >-
+      {{ states(start_entity) | float(-100) != new_start | float }}
+  - action: number.set_value
+    target:
+      entity_id: "{{ start_entity }}"
+    data:
+      value: "{{ new_start }}"
