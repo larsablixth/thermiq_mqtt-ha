@@ -64,6 +64,14 @@ It writes to the heat pump only when the target actually changes.
 | Pre-heat raise | 1 °C | Most people notice swings above ±1 °C |
 | Expensive-hour drop | 1 °C | 0 = never go below normal |
 
+## If you have a home battery
+
+A battery that already runs the house from cheap night power does the same
+job, at about the same loss. In a simulation of one such house (64 kWh
+battery, 2023–2026 SE3 prices, time tariff) the floor added **0–50 kr per
+winter** on top of the battery, against 400–650 kr without one. With a
+battery this blueprint is not worth the comfort swing.
+
 ## Things to know
 
 - **While enabled, the blueprint owns the indoor target.** Change the

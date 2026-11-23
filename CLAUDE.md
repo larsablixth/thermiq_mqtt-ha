@@ -92,7 +92,7 @@ falls back.
 ## Tests and CI
 
 ```bash
-python3 -m pytest tests -v     # 158 tests
+python3 -m pytest tests -v     # 173 tests
 python3 -m mypy                # config in mypy.ini
 black --check .
 ```

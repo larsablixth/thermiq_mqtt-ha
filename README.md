@@ -203,6 +203,9 @@ aio_energy_management:
 7. You will now be able to use the **Energy Management** Tab in the ThermIQ panel to enable energy control, set your low cost limit and select the number of hours you want to have enabled and a max hourly power cutoff to avoid peak power charges. The AIO and ThermIQ-Room2 will make sure the hours selected are the cheapest ones. Use MQTT-Explorer to ensure you get the expected behaviour.
 
 
+#### Hot water in cheap hours (experimental)
+A blueprint that lets the hot water tank drop to 35 °C and tops it up in the cheapest hours instead of right after showers. See [docs/hotwater_cheap_hours.md](docs/hotwater_cheap_hours.md).
+
 #### Pre-heating the floor in cheap hours (experimental)
 A blueprint that raises the indoor target ahead of expensive hours, but only when the price gap pays for the lost efficiency. See [docs/price_preheat.md](docs/price_preheat.md).
 
