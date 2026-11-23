@@ -1,0 +1,200 @@
+blueprint:
+  name: ThermIQ – pre-heat in cheap hours (experimental)
+  description: >
+    Raises the indoor target a little in cheap hours ahead of an expensive
+    spell, so the floor slab stores heat, then lowers it again while prices
+    are high.
+
+    It only acts when the price gap pays for the cost of loading the floor:
+    the heat pump runs less efficiently at a higher supply temperature, and a
+    warmer house leaks more heat. The **break-even ratio** is that cost.
+    Compared on the **total** price per kWh (spot + your fixed fees), the
+    expensive hours must be at least this many times the cheap ones. 1.3 is
+    a reasonable start; see docs/price_preheat.md.
+
+    Works with the Nordpool (HACS) sensor (`raw_today`/`raw_tomorrow`) and
+    the Entso-e sensor (`prices`). Hourly and 15-minute prices both work.
+
+    While enabled it owns the indoor target. Change the **normal indoor
+    target** here, not on the heat pump, or it will be overwritten.
+  domain: automation
+  source_url: https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/blueprints/automation/thermiq/price_preheat.yaml
+  input:
+    price_sensor:
+      name: Electricity price sensor
+      description: Nordpool (HACS) or Entso-e price sensor.
+      selector:
+        entity:
+          domain: sensor
+    target_entity:
+      name: Indoor target
+      description: The heat pump's indoor target temperature.
+      default: number.thermiq_mqtt_vp1_indoor_requested_t
+      selector:
+        entity:
+          domain: number
+    base_target:
+      name: Normal indoor target
+      description: The indoor target used when no price shift is worth it.
+      default: 21
+      selector:
+        number:
+          min: 10
+          max: 30
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    fixed_fee:
+      name: Fixed cost per kWh
+      description: >
+        Everything you pay per kWh that does not follow the spot price:
+        energy tax, grid transfer fee, supplier markup, VAT on those.
+        Use the same unit as the price sensor (e.g. SEK/kWh, not öre).
+        Leave at 0 if your price sensor already includes them.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 0.01
+          mode: box
+    breakeven:
+      name: Break-even ratio
+      description: >
+        How many times more the expensive hours must cost (total price)
+        before shifting is worth it. Lower = shifts more often.
+      default: 1.3
+      selector:
+        number:
+          min: 1.05
+          max: 3
+          step: 0.05
+          mode: box
+    window_hours:
+      name: Look-ahead (hours)
+      description: >
+        How far ahead to look for an expensive spell, and how far back to
+        look for the cheap hours that loaded the floor. Roughly how long
+        your floor holds heat.
+      default: 6
+      selector:
+        number:
+          min: 1
+          max: 12
+          step: 1
+          unit_of_measurement: h
+          mode: box
+    boost:
+      name: Pre-heat raise
+      description: How much to raise the indoor target in cheap hours.
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 3
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    coast:
+      name: Expensive-hour drop
+      description: >
+        How much to lower the indoor target in expensive hours, to use the
+        stored heat instead of buying more. 0 leaves it at normal.
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 3
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+
+mode: restart
+
+triggers:
+  # 15-minute cadence follows 15-minute price slots; harmless with hourly ones.
+  - trigger: time_pattern
+    minutes: "/15"
+    seconds: 30
+  - trigger: state
+    entity_id: !input price_sensor
+  - trigger: homeassistant
+    event: start
+
+variables:
+  price_sensor: !input price_sensor
+  target_entity: !input target_entity
+  base_target: !input base_target
+  fixed_fee: !input fixed_fee
+  breakeven: !input breakeven
+  window_hours: !input window_hours
+  boost: !input boost
+  coast: !input coast
+  # The whole decision lives in this one template so it can be tested on its
+  # own (tests/test_price_preheat_blueprint.py). Result: boost, coast,
+  # normal, or unknown (no usable price list: fall back to normal).
+  decision: >-
+    {%- set ns = namespace(slots=[]) -%}
+    {%- for i in (state_attr(price_sensor, 'raw_today') or [])
+               + (state_attr(price_sensor, 'raw_tomorrow') or []) -%}
+      {%- if i.value is number -%}
+        {%- set ns.slots = ns.slots + [[as_timestamp(i.start), i.value]] -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if not ns.slots -%}
+      {%- for i in state_attr(price_sensor, 'prices') or [] -%}
+        {%- if i.price is number -%}
+          {%- set ns.slots = ns.slots + [[as_timestamp(i.time), i.price]] -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+    {%- set t = as_timestamp(now()) -%}
+    {%- set w = window_hours | float(6) * 3600 -%}
+    {%- set fee = fixed_fee | float(0) -%}
+    {%- set ns.cur = none -%}
+    {%- set ns.ahead = [] -%}
+    {%- set ns.behind = [] -%}
+    {%- for s in ns.slots | sort(attribute=0) -%}
+      {%- if s[0] <= t -%}
+        {%- if s[0] >= t - w -%}
+          {%- set ns.behind = ns.behind + [s[1] + fee] -%}
+        {%- endif -%}
+        {%- set ns.cur = s -%}
+      {%- elif s[0] <= t + w -%}
+        {%- set ns.ahead = ns.ahead + [s[1] + fee] -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if ns.cur is none -%}
+      unknown
+    {%- else -%}
+      {%- set now_p = ns.cur[1] + fee -%}
+      {%- set be = breakeven | float(1.3) -%}
+      {%- if ns.ahead and (now_p <= 0 or (ns.ahead | max) >= be * now_p) -%}
+        boost
+      {%- elif ns.behind and (ns.behind | min) > 0
+               and now_p >= be * (ns.behind | min) -%}
+        coast
+      {%- else -%}
+        normal
+      {%- endif -%}
+    {%- endif -%}
+  target: >-
+    {%- set b = base_target | float(21) -%}
+    {%- if decision == 'boost' -%}{{ b + boost | float(0) }}
+    {%- elif decision == 'coast' -%}{{ b - coast | float(0) }}
+    {%- else -%}{{ b }}
+    {%- endif -%}
+
+conditions:
+  # Only write when the value changes: every write is a register write on
+  # the heat pump.
+  - condition: template
+    value_template: >-
+      {{ states(target_entity) | float(-100) != target | float }}
+
+actions:
+  - action: number.set_value
+    target:
+      entity_id: "{{ target_entity }}"
+    data:
+      value: "{{ target }}"
