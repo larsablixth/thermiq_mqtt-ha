@@ -17,9 +17,9 @@ from homeassistant.helpers.template import Template
 
 BLUEPRINT = (
     Path(__file__).parent.parent
+    / "custom_components"
+    / "thermiq_mqtt"
     / "blueprints"
-    / "automation"
-    / "thermiq"
     / "hotwater_cheap_hours.yaml"
 )
 SENSOR = "sensor.price"
@@ -212,3 +212,28 @@ async def test_tibber_reply_is_normalised(hass):
     assert out == [[start.timestamp(), 0.42], [start.timestamp() + 3600, 0.4]]
     # A failed call leaves no reply: no prices, not an error
     assert _render(hass, step, {}) == []
+
+
+async def test_blueprint_installed_into_config(hass, tmp_path):
+    """The integration copies its blueprint where HA looks for blueprints,
+    rewrites it only when it changed, and survives a read-only config."""
+    from custom_components.thermiq_mqtt import (
+        _install_blueprints,
+        async_install_blueprints,
+    )
+
+    target = tmp_path / "blueprints" / "automation" / "thermiq_mqtt" / BLUEPRINT.name
+    assert _install_blueprints(str(tmp_path)) == [BLUEPRINT.name]
+    assert target.read_bytes() == BLUEPRINT.read_bytes()
+    # Unchanged: not written again
+    assert _install_blueprints(str(tmp_path)) == []
+    # An older copy is replaced by the shipped one
+    target.write_text("old")
+    assert _install_blueprints(str(tmp_path)) == [BLUEPRINT.name]
+    assert target.read_bytes() == BLUEPRINT.read_bytes()
+
+    # A config folder that cannot be written is logged, not raised
+    blocked = tmp_path / "blocked"
+    blocked.write_text("a file where the folder should be")
+    hass.config.config_dir = str(blocked)
+    await async_install_blueprints(hass)

@@ -1,5 +1,5 @@
 blueprint:
-  name: ThermIQ – hot water in cheap hours (experimental)
+  name: ThermIQ – hot water in cheap hours (beta)
   description: >
     Lets the hot water tank drop to a low temperature (35 °C by default)
     before the heat pump reheats it, and tops the tank up in the cheapest
@@ -20,7 +20,7 @@ blueprint:
   homeassistant:
     # The variables action updating outer-scope variables (Tibber path)
     min_version: 2025.4.0
-  source_url: https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/blueprints/automation/thermiq/hotwater_cheap_hours.yaml
+  source_url: https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/custom_components/thermiq_mqtt/blueprints/hotwater_cheap_hours.yaml
   input:
     price_source:
       name: Price source

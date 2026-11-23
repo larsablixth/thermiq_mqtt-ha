@@ -1,13 +1,12 @@
-# Hot water in cheap hours (experimental)
+# Hot water in cheap hours (beta)
 
 After a few showers the heat pump normally reheats the tank straight away,
 often in the morning when electricity is most expensive. Most of the time
 that can wait: 35 °C is enough for a quick shower, and a few hours later
 power is cheaper.
 
-The blueprint
-[`blueprints/automation/thermiq/hotwater_cheap_hours.yaml`](../blueprints/automation/thermiq/hotwater_cheap_hours.yaml)
-does that with one heat pump setting, the hot water **start temperature**:
+The integration ships a blueprint (a ready-made automation) that does that
+with one heat pump setting, the hot water **start temperature**:
 
 | When | Start temperature | Effect |
 |---|---|---|
@@ -15,6 +14,24 @@ does that with one heat pump setting, the hot water **start temperature**:
 | The cheapest hours of the next 24 h | stop temperature − 3 °C | The tank is topped up while power is cheap |
 
 The stop temperature (how hot the tank gets) is never changed.
+
+## Turning it on
+
+1. Update the integration to 3.5.12-beta.2 or later (HACS: *Show beta
+   versions*) and restart Home Assistant.
+2. **Settings → Automations & scenes → Blueprints**: *ThermIQ – hot water in
+   cheap hours (beta)* is already there. Nothing runs until you create an
+   automation from it.
+3. Check the legionella settings on the heat pump (below).
+4. *Create automation*, pick your price source, enter your peak grid fee if
+   you have one, save.
+
+To stop: disable or delete that automation, then set the hot water start
+temperature on the heat pump back to what it was.
+
+The blueprint file is kept in `blueprints/automation/thermiq_mqtt/` and is
+replaced when an update brings a new version. To change it yourself, copy it
+under another name first.
 
 ## Why this saves money with no downside in efficiency
 
@@ -74,5 +91,5 @@ above it, it just is not topped up early.
   turn the automation off, set the start temperature back by hand.
 - Every change is a write to the heat pump; it only writes when the value
   actually changes (a few times a day).
-- Experimental: nobody has run it on real hardware yet. Watch the tank
+- Beta: nobody has run it on real hardware yet. Watch the tank
   temperature (`boiler_t`) for the first days.

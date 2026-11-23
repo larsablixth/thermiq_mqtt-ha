@@ -198,6 +198,48 @@ async def async_register_frontend(hass: HomeAssistant) -> None:
     _LOGGER.debug("Registered ThermIQ widget card at %s", FRONTEND_URL_BASE)
 
 
+# Blueprints shipped with the integration (beta functions). Copied into
+# <config>/blueprints/automation/thermiq_mqtt/ so they appear under
+# Settings > Automations > Blueprints without a separate import. Nothing runs
+# until the user creates an automation from one.
+BLUEPRINTS_SRC = Path(__file__).parent / "blueprints"
+
+
+def _install_blueprints(config_dir: str) -> list[str]:
+    """Copy the bundled blueprints into HA's blueprint folder.
+
+    A file is (re)written only when its content differs, so an update of the
+    integration brings the new blueprint and an unchanged one is not touched.
+    The folder is the integration's own: the files there are ours, a user who
+    wants to change one should copy it under another name.
+    Returns the names written. Runs in the executor (file I/O).
+    """
+    dest = Path(config_dir) / "blueprints" / "automation" / DOMAIN
+    written = []
+    for src in sorted(BLUEPRINTS_SRC.glob("*.yaml")):
+        target = dest / src.name
+        content = src.read_bytes()
+        if target.is_file() and target.read_bytes() == content:
+            continue
+        dest.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        written.append(src.name)
+    return written
+
+
+async def async_install_blueprints(hass: HomeAssistant) -> None:
+    """Install the bundled blueprints; a failure must not stop the setup."""
+    try:
+        written = await hass.async_add_executor_job(
+            _install_blueprints, hass.config.config_dir
+        )
+    except OSError as err:
+        _LOGGER.warning("Could not install ThermIQ blueprints: %s", err)
+        return
+    for name in written:
+        _LOGGER.info("Installed ThermIQ blueprint %s", name)
+
+
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up HASL integration"""
     _LOGGER.info("Setup ThermIQ-MQTT integration")
@@ -205,6 +247,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     if DOMAIN not in hass.data:
         worker = hass.data.setdefault(DOMAIN, ThermIQWorker(hass))
     await async_register_frontend(hass)
+    await async_install_blueprints(hass)
     return True
 
 
