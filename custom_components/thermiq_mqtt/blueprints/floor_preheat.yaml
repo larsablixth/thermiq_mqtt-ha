@@ -14,6 +14,10 @@ blueprint:
     Prices: Tibber, Nordpool (HACS) or Entso-e; hourly and 15-minute prices
     both work. See docs/floor_preheat.md.
 
+    Optional: give it a weather entity and it skips the pre-heat when the
+    hours ahead are forecast much warmer, since the stored heat would not be
+    needed.
+
     While enabled it owns the indoor target. Change the **normal indoor
     target** here, not on the heat pump, or it will be overwritten.
   domain: automation
@@ -112,6 +116,29 @@ blueprint:
           step: 1
           unit_of_measurement: h
           mode: box
+    weather_entity:
+      name: Weather forecast (optional)
+      description: >
+        A weather entity with an hourly forecast. When the look-ahead is
+        forecast to be much warmer than now, the pre-heat is skipped. Leave
+        empty to ignore the weather.
+      default: ""
+      selector:
+        entity:
+          domain: weather
+    warmer_by:
+      name: Skip pre-heat when it gets warmer by
+      description: >
+        How much warmer than now the look-ahead must be forecast, on average,
+        before the pre-heat is skipped. Only used with a weather forecast.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 15
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
     peak_fee:
       name: Extra grid fee in peak hours
       description: >
@@ -196,6 +223,8 @@ variables:
   coast: !input coast
   breakeven: !input breakeven
   window_hours: !input window_hours
+  weather_entity: !input weather_entity
+  warmer_by: !input warmer_by
   peak_fee: !input peak_fee
   other_fees: !input other_fees
   peak_start_hour: !input peak_start_hour
@@ -221,6 +250,9 @@ variables:
     {%- endif -%}
     {{ ns.s }}
   tibber_slots: []
+  # [[unix timestamp, °C], ...] from the hourly forecast, filled in the
+  # actions when a weather entity is set.
+  forecast_slots: []
 
 actions:
   - if:
@@ -245,6 +277,31 @@ actions:
                     {%- set ns.s = ns.s + [[as_timestamp(i.start_time), i.price]] -%}
                   {%- endif -%}
                 {%- endfor -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.s }}
+  # Hourly forecast, normalised to [[timestamp, °C], ...]. Not every weather
+  # integration has an hourly forecast; without one the list stays empty and
+  # the weather is ignored.
+  - if:
+      - condition: template
+        value_template: "{{ weather_entity | default('') != '' }}"
+    then:
+      - action: weather.get_forecasts
+        target:
+          entity_id: "{{ weather_entity }}"
+        data:
+          type: hourly
+        response_variable: forecast_reply
+        continue_on_error: true
+      - variables:
+          forecast_slots: >-
+            {%- set ns = namespace(s=[]) -%}
+            {%- set fc = ((forecast_reply | default({})).get(weather_entity, {}))
+                         .get('forecast', []) -%}
+            {%- for i in fc -%}
+              {%- if i.temperature is number -%}
+                {%- set ns.s = ns.s + [[as_timestamp(i.datetime), i.temperature]] -%}
               {%- endif -%}
             {%- endfor -%}
             {{ ns.s }}
@@ -279,7 +336,17 @@ actions:
                           | selectattr(0, '<=', ns.cur[0] + w) | map(attribute=1) | list -%}
           {%- set behind = ns.costs | selectattr(0, '<', ns.cur[0])
                            | selectattr(0, '>=', ns.cur[0] - w) | map(attribute=1) | list -%}
-          {%- if ahead and (now_p <= 0 or (ahead | max) >= be * now_p) -%}
+          {#- Forecast: average over the look-ahead vs the temperature now -#}
+          {%- set temps = forecast_slots | selectattr(0, '>', t)
+                          | selectattr(0, '<=', t + w) | map(attribute=1) | list -%}
+          {%- set now_c = state_attr(weather_entity, 'temperature')
+                          if weather_entity else none -%}
+          {%- set warmer = temps and now_c is number
+                           and (temps | sum) / (temps | length)
+                               >= now_c + warmer_by | float(5) -%}
+          {%- if ahead and now_p <= 0 -%}
+            boost
+          {%- elif ahead and (ahead | max) >= be * now_p and not warmer -%}
             boost
           {%- elif behind and (behind | min) > 0 and now_p >= be * (behind | min) -%}
             coast
