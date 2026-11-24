@@ -51,6 +51,24 @@ def _defaults() -> dict[str, Any]:
     return {k: v["default"] for k, v in inputs.items() if "default" in v}
 
 
+def _decision_vars() -> dict[str, Any]:
+    """The variables step holding the decision, wherever it sits."""
+    for action in _load(BLUEPRINT)["actions"]:
+        if "decision" in action.get("variables", {}):
+            variables: dict[str, Any] = action["variables"]
+            return variables
+    raise AssertionError("no decision step in the blueprint")
+
+
+def _forecast_step() -> dict[str, Any]:
+    """The step that fetches and normalises the hourly forecast."""
+    for action in _load(BLUEPRINT)["actions"]:
+        if "weather.get_forecasts" in str(action):
+            step: dict[str, Any] = action
+            return step
+    raise AssertionError("no forecast step in the blueprint")
+
+
 def _slots(prices: list[float], minutes: int = 60) -> list[list[float]]:
     return [
         [(DAY + timedelta(minutes=minutes * i)).timestamp(), p]
@@ -71,9 +89,10 @@ async def _decide(hass, freezer, at_hour: float, prices, **inputs) -> str:
             _slots(prices) if prices and not isinstance(prices[0], list) else prices
         ),
         "tibber_slots": [],
+        "forecast_slots": [],
         **inputs,
     }
-    template = _load(BLUEPRINT)["actions"][1]["variables"]["decision"]
+    template = _decision_vars()["decision"]
     return str(_render(hass, template, variables)).strip()
 
 
@@ -145,9 +164,111 @@ async def test_no_prices(hass, freezer):
     [("boost", 22.0), ("coast", 20.0), ("normal", 21.0), ("unknown", 21.0)],
 )
 async def test_new_target(hass, decision, expected):
-    template = _load(BLUEPRINT)["actions"][1]["variables"]["new_target"]
+    template = _decision_vars()["new_target"]
     out = _render(hass, template, {**_defaults(), "decision": decision})
     assert float(out) == expected
+
+
+# Spot 0.30 now, 1.50 from 06: a clear boost at 02:00 without weather
+SPIKE = [0.30] * 6 + [1.50] * 18 + [0.30] * 24
+WEATHER = "weather.home"
+
+
+def _forecast(start_hour: float, temps: list[float]) -> list[list[float]]:
+    """Hourly forecast from start_hour on, as the blueprint keeps it."""
+    return [
+        [(DAY + timedelta(hours=start_hour + i)).timestamp(), c]
+        for i, c in enumerate(temps)
+    ]
+
+
+async def _decide_with_weather(hass, freezer, now_c, temps, prices=SPIKE, **inputs):
+    hass.states.async_set(WEATHER, "cloudy", {"temperature": now_c})
+    return await _decide(
+        hass,
+        freezer,
+        2,
+        prices,
+        weather_entity=WEATHER,
+        forecast_slots=_forecast(3, temps),
+        **inputs,
+    )
+
+
+async def test_much_warmer_ahead_skips_the_boost(hass, freezer):
+    """-10 now, about -3 on average over the next 8 h: 7 °C warmer."""
+    temps = [-8, -6, -4, -3, -2, -1, 0, 0]
+    assert await _decide_with_weather(hass, freezer, -10, temps) == "normal"
+
+
+async def test_slightly_warmer_ahead_still_boosts(hass, freezer):
+    temps = [-9, -8, -8, -7, -7, -7, -7, -7]
+    assert await _decide_with_weather(hass, freezer, -10, temps) == "boost"
+
+
+async def test_colder_ahead_still_boosts(hass, freezer):
+    assert await _decide_with_weather(hass, freezer, -5, [-12] * 8) == "boost"
+
+
+async def test_warmer_by_is_a_setting(hass, freezer):
+    temps = [-7] * 8  # 3 °C warmer than now
+    assert await _decide_with_weather(hass, freezer, -10, temps) == "boost"
+    assert (
+        await _decide_with_weather(hass, freezer, -10, temps, warmer_by=2) == "normal"
+    )
+
+
+async def test_only_the_look_ahead_counts(hass, freezer):
+    """A warm spell beyond the 8 h look-ahead does not stop the boost."""
+    temps = [-10] * 8 + [10] * 16
+    assert await _decide_with_weather(hass, freezer, -10, temps) == "boost"
+
+
+async def test_negative_price_boosts_whatever_the_weather(hass, freezer):
+    prices = [0.3] * 48
+    prices[2] = -0.5
+    assert await _decide_with_weather(hass, freezer, -10, [5] * 8, prices) == "boost"
+
+
+async def test_no_forecast_ignores_the_weather(hass, freezer):
+    """No hourly forecast (or no weather entity): behaves as before."""
+    assert await _decide_with_weather(hass, freezer, -10, []) == "boost"
+    hass.states.async_set(WEATHER, "unavailable", {})
+    assert (
+        await _decide(
+            hass,
+            freezer,
+            2,
+            SPIKE,
+            weather_entity=WEATHER,
+            forecast_slots=_forecast(3, [10] * 8),
+        )
+        == "boost"
+    )
+
+
+async def test_forecast_reply_is_normalised(hass):
+    """weather.get_forecasts reply -> [[timestamp, °C], ...], skipping
+    entries without a temperature."""
+    template = _forecast_step()["then"][1]["variables"]["forecast_slots"]
+    reply = {
+        WEATHER: {
+            "forecast": [
+                {"datetime": "2026-01-15T03:00:00+01:00", "temperature": -4.5},
+                {"datetime": "2026-01-15T04:00:00+01:00", "temperature": None},
+                {"datetime": "2026-01-15T05:00:00+01:00", "temperature": -3},
+            ]
+        }
+    }
+    out = _render(hass, template, {"weather_entity": WEATHER, "forecast_reply": reply})
+    assert out == [
+        [(DAY + timedelta(hours=3)).timestamp(), -4.5],
+        [(DAY + timedelta(hours=5)).timestamp(), -3],
+    ]
+
+
+def test_forecast_is_off_by_default():
+    assert _defaults()["weather_entity"] == ""
 
 
 def test_price_conversions_match_the_hot_water_blueprint():

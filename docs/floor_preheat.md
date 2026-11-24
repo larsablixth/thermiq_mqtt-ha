@@ -95,6 +95,29 @@ Every 15 minutes, using all published prices (tomorrow's are out around
 
 It writes to the heat pump only when the target actually changes.
 
+## Using the weather forecast (optional)
+
+Heat stored before a mild spell is not needed: the house will use less heat
+anyway, and the slab only leaks it away. Give the blueprint a **weather
+entity** and it skips the pre-heat when the look-ahead is forecast to be much
+warmer than now.
+
+| Situation | Action |
+|---|---|
+| The forecast for the look-ahead averages at least *warmer by* (5 °C to start with) above the temperature now | **No pre-heat**, even if prices say so |
+| Colder, about the same, or only a little warmer | Prices decide, as above |
+| What you pay now is zero or negative | **Pre-heat**, whatever the weather |
+
+The give-back in expensive hours is not affected.
+
+- The entity needs an **hourly** forecast. Met.no, which Home Assistant sets
+  up by default, has one. Without an hourly forecast, or with no weather
+  entity, the weather is ignored and the blueprint behaves as before.
+- "Now" is the weather entity's current temperature, so both numbers come from
+  the same source.
+- Pick a weather entity for your own location: a few kilometres inland can
+  be several degrees colder on a winter night than the nearest city.
+
 ## Settings to start with
 
 | Setting | Start at | Notes |
@@ -103,6 +126,8 @@ It writes to the heat pump only when the target actually changes.
 | Look-ahead | 8 h | About how long the slab holds its heat |
 | Pre-heat raise | 1 °C | Most people notice swings above ±1 °C |
 | Expensive-hour drop | 1 °C | 0 = never go below normal |
+| Weather forecast | empty | Optional: a weather entity with an hourly forecast |
+| Skip pre-heat when it gets warmer by | 5 °C | Lower = skips more often |
 
 ## Things to know
 
