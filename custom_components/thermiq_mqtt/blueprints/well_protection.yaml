@@ -1,0 +1,171 @@
+blueprint:
+  name: ThermIQ – protect a shallow energy well (beta)
+  description: >
+    Eases off before the heat pump's own brine alarm does. When the brine
+    gets close to the alarm limit, it lowers the heating curve's maximum
+    supply temperature, so the pump makes cooler water and draws less heat
+    from the well. When the brine has recovered, the normal maximum comes
+    back.
+
+    It only matters on cold days, when the curve asks for more than the
+    lowered maximum, and those are the days the brine runs low. The house
+    gets a little less heat while it is active; a concrete floor or other
+    thermal mass covers that for a while.
+
+    It changes the heating curve's **maximum**, not the indoor target, so it
+    works alongside the floor pre-heat blueprint. While enabled it owns the
+    curve maximum: change the **normal curve maximum** here, not on the heat
+    pump. See docs/well_protection.md.
+  domain: automation
+  source_url: https://github.com/larsablixth/thermiq_mqtt-ha/blob/master/custom_components/thermiq_mqtt/blueprints/well_protection.yaml
+  input:
+    brine_entity:
+      name: Brine temperature
+      description: >
+        Brine out (leaving the heat pump, the colder side) by default, so it
+        acts before the heat pump's alarm whichever side that watches.
+      default: sensor.thermiq_mqtt_vp1_brine_out_t
+      selector:
+        entity:
+          domain: sensor
+    brine_pump_entity:
+      name: Brine pump running
+      description: >
+        The brine reading is only trusted while the brine pump runs; when it
+        stands still the pipe drifts towards room temperature.
+      default: binary_sensor.thermiq_mqtt_vp1_brine_pump_on
+      selector:
+        entity:
+          domain: binary_sensor
+    alarm_entity:
+      name: Heat pump's brine alarm limit
+      description: The heat pump's own minimum brine temperature setting.
+      default: number.thermiq_mqtt_vp1_brine_min_t
+      selector:
+        entity:
+          domain: number
+    curve_max_entity:
+      name: Heating curve maximum
+      default: number.thermiq_mqtt_vp1_integral1_curve_max
+      selector:
+        entity:
+          domain: number
+    margin:
+      name: Act this far above the alarm
+      description: >
+        Ease off when the brine is within this many degrees of the alarm
+        limit.
+      default: 2
+      selector:
+        number:
+          min: 0.5
+          max: 10
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    recover:
+      name: Recovery before restoring
+      description: >
+        How much warmer than the trigger point the brine must get before the
+        normal maximum comes back. Keeps it from switching back and forth.
+      default: 3
+      selector:
+        number:
+          min: 0.5
+          max: 10
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    fallback_limit:
+      name: Brine limit when the heat pump's alarm is off
+      description: >
+        The heat pump treats an alarm limit of -15 °C as "off". This limit is
+        used instead in that case.
+      default: -5
+      selector:
+        number:
+          min: -15
+          max: 5
+          step: 0.5
+          unit_of_measurement: "°C"
+          mode: box
+    normal_max:
+      name: Normal curve maximum
+      description: The heating curve's maximum supply temperature normally.
+      default: 55
+      selector:
+        number:
+          min: 25
+          max: 65
+          step: 1
+          unit_of_measurement: "°C"
+          mode: box
+    eased_max:
+      name: Eased curve maximum
+      description: >
+        The maximum while the brine is low. 5–10 °C below normal is a good
+        start; it must be below the normal maximum to have any effect.
+      default: 45
+      selector:
+        number:
+          min: 20
+          max: 60
+          step: 1
+          unit_of_measurement: "°C"
+          mode: box
+
+mode: restart
+
+triggers:
+  - trigger: time_pattern
+    minutes: "/5"
+  - trigger: homeassistant
+    event: start
+
+variables:
+  brine_entity: !input brine_entity
+  brine_pump_entity: !input brine_pump_entity
+  alarm_entity: !input alarm_entity
+  curve_max_entity: !input curve_max_entity
+  margin: !input margin
+  recover: !input recover
+  fallback_limit: !input fallback_limit
+  normal_max: !input normal_max
+  eased_max: !input eased_max
+
+actions:
+  # The decision lives in this one template so it can be tested on its own
+  # (tests/test_well_protection_blueprint.py). Result: ease, normal, or
+  # hold (brine pump stopped, or no usable readings: change nothing).
+  - variables:
+      decision: >-
+        {%- set brine = states(brine_entity) | float(none) -%}
+        {%- set alarm = states(alarm_entity) | float(none) -%}
+        {%- set cur = states(curve_max_entity) | float(none) -%}
+        {%- set limit = (fallback_limit | float(-5)) if alarm is none or alarm <= -15
+                        else alarm + margin | float(2) -%}
+        {%- set eased = cur is number and cur <= eased_max | float(45) -%}
+        {%- if brine is none or not is_state(brine_pump_entity, 'on') -%}
+          hold
+        {%- elif brine < limit -%}
+          ease
+        {%- elif eased and brine < limit + recover | float(3) -%}
+          ease
+        {%- else -%}
+          normal
+        {%- endif -%}
+      new_max: >-
+        {%- if decision == 'ease' -%}{{ eased_max | float(45) }}
+        {%- elif decision == 'normal' -%}{{ normal_max | float(55) }}
+        {%- else -%}hold
+        {%- endif -%}
+  # Only write when the value changes: every write is a register write.
+  - condition: template
+    value_template: >-
+      {{ new_max != 'hold'
+         and states(curve_max_entity) | float(-100) != new_max | float }}
+  - action: number.set_value
+    target:
+      entity_id: "{{ curve_max_entity }}"
+    data:
+      value: "{{ new_max }}"

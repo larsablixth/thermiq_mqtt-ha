@@ -209,6 +209,9 @@ A blueprint, installed with the integration, that lets the hot water tank drop t
 #### Pre-heating the floor in cheap hours (beta)
 A blueprint, installed with the integration, that stores heat in a concrete floor slab ahead of expensive hours, but only when the price gap pays for the lost efficiency. See [docs/floor_preheat.md](docs/floor_preheat.md).
 
+#### Protecting a shallow energy well (beta)
+A blueprint, installed with the integration, that lowers the heating curve's maximum supply temperature while the brine is close to the heat pump's alarm limit, so the pump eases off before the alarm stops it. See [docs/well_protection.md](docs/well_protection.md).
+
 
 # Misc
 #### Automations
