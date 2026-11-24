@@ -10,8 +10,10 @@ import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
 from .heatpump import HeatPump
@@ -27,6 +29,38 @@ _LOGGER = logging.getLogger(__name__)
 # Named modes available in the translation table (mode0..mode4)
 MODE_VALUES = [0, 1, 2, 3, 4]
 
+# Installation topology (#80). These describe the plumbing around the pump,
+# which the pump itself cannot report, so they are declared by the user rather
+# than read from a register. Two independent axes rather than one list of
+# combinations: a new emitter type is one more option on one selector, and
+# every combination keeps working.
+#
+# The options are stable keys, not translated labels, because the widget
+# compares against them. The first option of each is the default and draws
+# exactly what the widget drew before these existed.
+TOPOLOGY_OPTIONS: dict[str, list[str]] = {
+    "main_circuit": ["direct", "buffer"],
+    "secondary_circuit": ["none", "pool", "floor"],
+}
+
+# Friendly names, indexed like AVAILABLE_LANGUAGES: en, se, fi, no, de
+TOPOLOGY_NAMES: dict[str, list[str]] = {
+    "main_circuit": [
+        "Main circuit",
+        "Huvudkrets",
+        "Pääpiiri",
+        "Hovedkrets",
+        "Hauptkreis",
+    ],
+    "secondary_circuit": [
+        "Secondary circuit",
+        "Sekundärkrets",
+        "Toisiopiiri",
+        "Sekundærkrets",
+        "Sekundärkreis",
+    ],
+}
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -35,11 +69,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up the ThermIQ select entities for a config entry."""
     heatpump = hass.data[DOMAIN].heatpumps[config_entry.data["id_name"]]
-    entities = [
+    entities: list[SelectEntity] = [
         ThermIQSelect(heatpump, key)
         for key in reg_id
         if reg_id[key][FIELD_REGTYPE] == "select_input"
     ]
+    entities.extend(ThermIQTopologySelect(heatpump, key) for key in TOPOLOGY_OPTIONS)
     async_add_entities(entities)
 
 
@@ -121,3 +156,43 @@ class ThermIQSelect(SelectEntity):
         if snapshot != getattr(self, "_last_snapshot", None):
             self._last_snapshot = snapshot
             self.async_write_ha_state()
+
+
+class ThermIQTopologySelect(SelectEntity, RestoreEntity):
+    """What is plumbed around the pump: declared by the user, never sent.
+
+    Nothing is written to the pump. The choice lives in Home Assistant and
+    survives restarts through RestoreEntity. It is always available, even
+    while the pump is silent, because it describes the house rather than the
+    pump's current state.
+
+    This entity says what *exists*. Whether a circuit is running right now is
+    a separate question with its own entities - one condition, one job.
+    """
+
+    _attr_should_poll = False
+    _attr_has_entity_name = False
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:pipe"
+
+    def __init__(self, heatpump: HeatPump, key: str) -> None:
+        self._key = key
+        self.entity_id = f"select.{heatpump._domain}_{heatpump._id}_{key}"
+        self._attr_unique_id = "uid-" + self.entity_id
+        self._attr_name = TOPOLOGY_NAMES[key][heatpump._langid]
+        self._attr_options = list(TOPOLOGY_OPTIONS[key])
+        self._attr_current_option = self._attr_options[0]
+
+    async def async_select_option(self, option: str) -> None:
+        """Store the declared topology."""
+        if option not in self._attr_options:
+            _LOGGER.warning("Unknown option %s for %s", option, self.entity_id)
+            return
+        self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last declared choice; fall back to the default."""
+        last = await self.async_get_last_state()
+        if last is not None and last.state in self._attr_options:
+            self._attr_current_option = last.state
