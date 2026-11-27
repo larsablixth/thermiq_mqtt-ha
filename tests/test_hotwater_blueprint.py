@@ -172,6 +172,28 @@ async def test_new_start(hass, decision, stop, expected):
     assert float(out) == expected
 
 
+@pytest.mark.parametrize(
+    ("decision", "stop", "max_start", "expected"),
+    [
+        ("cheap", 59, 40, 40.0),  # pump keeps at most 40: ask for 40, not 56
+        ("cheap", 50, 60, 47.0),  # the default limits nothing
+        ("wait", 59, 40, 35.0),
+        ("cheap", 59, 30, 35.0),  # never below the lowest accepted
+    ],
+)
+async def test_new_start_respects_the_pumps_limit(
+    hass, decision, stop, max_start, expected
+):
+    hass.states.async_set(STOP, str(stop))
+    variables = {**_defaults(), "decision": decision, "max_start": max_start}
+    out = _render(hass, _decision_step()["new_start"], variables)
+    assert float(out) == expected
+
+
+def test_max_start_is_off_by_default():
+    assert _defaults()["max_start"] == 60
+
+
 async def test_nordpool_and_entsoe_attributes(hass):
     start = DAY + timedelta(hours=2)
     hass.states.async_set(

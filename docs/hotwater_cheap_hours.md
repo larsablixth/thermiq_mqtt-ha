@@ -61,6 +61,7 @@ This blueprint does not touch either setting.
 | Lowest accepted temperature | 35 °C | The tank never goes below this |
 | Cheap hours per day | 3 h | Enough to heat the tank from the lowest temperature |
 | Top-up margin | 3 °C | In cheap hours, start = stop − this |
+| Highest start temperature the heat pump accepts | 60 °C (no limit) | Set it if your pump stores a lower start temperature than it is sent (see below) |
 | Extra grid fee in peak hours | 0 | Vattenfall time tariff: 0.46 SEK/kWh, weekdays 06–22, Nov–Mar |
 
 With a time-of-day grid fee, enter it: otherwise a cheap spot hour at 10:00
@@ -87,5 +88,12 @@ above it, it just is not topped up early.
   turn the automation off, set the start temperature back by hand.
 - Every change is a write to the heat pump; it only writes when the value
   actually changes (a few times a day).
+- **Some heat pumps limit the start temperature.** One stores 40 °C when it
+  is sent 56 °C. You can see it in the start temperature's history: the value
+  jumps back a few seconds after the automation writes it. Enter that value
+  as *highest start temperature the heat pump accepts*. In cheap hours the
+  tank is then topped up only if it has fallen below that value, so less of
+  the reheating moves to cheap hours, but the automation stops rewriting the
+  value every 15 minutes.
 - Beta: nobody has run it on real hardware yet. Watch the tank
   temperature (`boiler_t`) for the first days.

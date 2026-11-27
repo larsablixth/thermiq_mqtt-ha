@@ -92,6 +92,21 @@ blueprint:
           step: 1
           unit_of_measurement: "°C"
           mode: box
+    max_start:
+      name: Highest start temperature the heat pump accepts
+      description: >
+        Some heat pumps store a lower value than they are sent: one stores 40
+        when asked for 56. If yours does, enter that value here, so the
+        automation asks for what the pump will keep instead of rewriting it
+        every 15 minutes. The default does not limit anything.
+      default: 60
+      selector:
+        number:
+          min: 30
+          max: 80
+          step: 1
+          unit_of_measurement: "°C"
+          mode: box
     peak_fee:
       name: Extra grid fee in peak hours
       description: >
@@ -161,6 +176,7 @@ variables:
   low_start: !input low_start
   cheap_hours: !input cheap_hours
   reheat_margin: !input reheat_margin
+  max_start: !input max_start
   peak_fee: !input peak_fee
   peak_start_hour: !input peak_start_hour
   peak_end_hour: !input peak_end_hour
@@ -259,7 +275,8 @@ actions:
         {%- set low = low_start | float(35) -%}
         {%- set stop = states(stop_entity) | float(0) -%}
         {%- if decision == 'cheap' and stop > low -%}
-          {{ [stop - reheat_margin | float(3), low] | max }}
+          {#- just below stop, but no higher than the pump keeps -#}
+          {{ [[stop - reheat_margin | float(3), max_start | float(60)] | min, low] | max }}
         {%- else -%}
           {{ low }}
         {%- endif -%}
