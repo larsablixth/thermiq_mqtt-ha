@@ -22,7 +22,8 @@ The stop temperature (how hot the tank gets) is never changed.
 2. **Settings → Automations & scenes → Blueprints**: *ThermIQ – hot water in
    cheap hours (beta)* is already there. Nothing runs until you create an
    automation from it.
-3. Check the legionella settings on the heat pump (below).
+3. Check the legionella settings on the heat pump (below), including that
+   the legionella run is actually switched on.
 4. *Create automation*, pick your price source, enter your peak grid fee if
    you have one, save.
 
@@ -48,10 +49,24 @@ A tank allowed down to 35 °C spends long periods at 25–45 °C, the range in
 which legionella bacteria grow. The heat pump has its own periodic
 high-temperature run; **keep it on**:
 
+- *Legionella peak heating enable* (`legionella_run_on`): **1**. This is
+  the on/off switch. With it at 0 the two settings below are kept but never
+  run, so check it first: on one installation the interval and temperature
+  looked right while the switch was off.
 - *Legionella interval* (`legionella_interval_d`): at most 7 days
 - *Legionella stop temperature* (`legionella_stop_t`): at least 60 °C
 
-This blueprint does not touch either setting.
+The run often needs the heat pump's **electric heater** to reach 60 °C. If
+you have switched the heater off, watch the tank temperature (`boiler_t`)
+during a run to see whether it gets there.
+
+If the legionella run is off and you don't want to turn it on, don't let the
+tank sit low: set the *lowest accepted temperature* to at least 45 °C, or
+don't use this blueprint. Some heat pumps keep the start temperature at no
+more than 40 °C (see *Things to know*); on those, 45 °C is not possible
+through the start temperature, and this blueprint has nothing left to do.
+
+This blueprint does not touch any of these settings.
 
 ## Settings
 

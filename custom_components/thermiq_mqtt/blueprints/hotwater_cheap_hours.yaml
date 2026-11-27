@@ -10,8 +10,9 @@ blueprint:
     low most of the time, just below the stop temperature in cheap hours.
     The stop temperature is left alone.
 
-    **Keep the heat pump's legionella function on** (interval at most 7
-    days, legionella stop temperature at least 60 °C). A tank that sits at
+    **Keep the heat pump's legionella function on**: the run itself switched
+    on (legionella_run_on = 1, not only configured), interval at most 7
+    days, legionella stop temperature at least 60 °C. A tank that sits at
     35–45 °C is in the range where legionella bacteria grow.
 
     Prices: Tibber, Nordpool (HACS) or Entso-e; hourly and 15-minute prices
